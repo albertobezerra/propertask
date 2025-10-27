@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:propertask/core/services/auth_service.dart';
-import 'dashboard_screen.dart';
+import 'package:propertask/screen/dashboard_screen.dart';
+import 'package:propertask/widgets/custom_text_field.dart';
+import 'package:propertask/widgets/loading_widget.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
   _LoginScreenState createState() => _LoginScreenState();
 }
 
@@ -28,11 +30,10 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (!success) {
-        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text(
-              'Erro: Usuário não encontrado ou permissões insuficientes.',
+              'Email ou senha incorretos, ou usuário não registrado.',
             ),
           ),
         );
@@ -44,14 +45,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
       debugPrint('✅ Navegando para Dashboard');
       Navigator.pushReplacement(
-        // ignore: use_build_context_synchronously
         context,
-        MaterialPageRoute(builder: (_) => DashboardScreen()),
+        MaterialPageRoute(builder: (_) => const DashboardScreen()),
       );
     } catch (e) {
       debugPrint('❌ Erro ao fazer login: $e');
+      FirebaseCrashlytics.instance.recordError(e, StackTrace.current);
       ScaffoldMessenger.of(
-        // ignore: use_build_context_synchronously
         context,
       ).showSnackBar(SnackBar(content: Text('Erro ao fazer login: $e')));
       setState(() {
@@ -64,24 +64,35 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     debugPrint('LoginScreen: Iniciando build');
     return Scaffold(
-      appBar: AppBar(title: Text('Propertask - Login')),
+      appBar: AppBar(title: const Text('Propertask - Login')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: _isLoading
-            ? Center(child: CircularProgressIndicator())
+            ? const LoadingWidget()
             : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  TextField(
+                  CustomTextField(
                     controller: _emailController,
-                    decoration: InputDecoration(labelText: 'Email'),
+                    hintText: 'Email',
+                    prefixIcon: Icons.email,
+                    keyboardType: TextInputType.emailAddress,
                   ),
-                  TextField(
+                  const SizedBox(height: 16),
+                  CustomTextField(
                     controller: _passwordController,
+                    hintText: 'Senha',
+                    prefixIcon: Icons.lock,
                     obscureText: true,
-                    decoration: InputDecoration(labelText: 'Senha'),
                   ),
-                  SizedBox(height: 20),
-                  ElevatedButton(onPressed: _login, child: Text('Entrar')),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: _login,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 50),
+                    ),
+                    child: const Text('Entrar'),
+                  ),
                 ],
               ),
       ),
