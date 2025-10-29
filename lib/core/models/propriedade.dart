@@ -3,16 +3,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class Propriedade {
   final String id;
   final String nome;
-  final String localizacao;
+  final String endereco;
+  final String acesso;
+  final String? codigoAcesso;
+  final String? lockboxLocal;
+  final List<String> fotos;
+  final String tipologia;
   final DateTime criadoEm;
-  final String? imageUrl;
 
   Propriedade({
     required this.id,
     required this.nome,
-    required this.localizacao,
+    required this.endereco,
+    required this.acesso,
+    this.codigoAcesso,
+    this.lockboxLocal,
+    required this.fotos,
+    required this.tipologia,
     required this.criadoEm,
-    this.imageUrl,
   });
 
   factory Propriedade.fromFirestore(DocumentSnapshot doc) {
@@ -20,18 +28,24 @@ class Propriedade {
     return Propriedade(
       id: doc.id,
       nome: data['nome'] ?? '',
-      localizacao: data['localizacao'] ?? '',
+      endereco: data['endereco'] ?? '',
+      acesso: data['acesso'] ?? 'chave',
+      codigoAcesso: data['codigoAcesso'],
+      lockboxLocal: data['lockboxLocal'],
+      fotos: List<String>.from(data['fotos'] ?? []),
+      tipologia: data['tipologia'] ?? 'T1',
       criadoEm: (data['criadoEm'] as Timestamp).toDate(),
-      imageUrl: data['imageUrl'],
     );
   }
 
-  Map<String, dynamic> toFirestore() {
-    return {
-      'nome': nome,
-      'localizacao': localizacao,
-      'criadoEm': Timestamp.fromDate(criadoEm),
-      if (imageUrl != null) 'imageUrl': imageUrl,
-    };
-  }
+  Map<String, dynamic> toFirestore() => {
+    'nome': nome,
+    'endereco': endereco,
+    'acesso': acesso,
+    'codigoAcesso': codigoAcesso,
+    'lockboxLocal': lockboxLocal,
+    'fotos': fotos,
+    'tipologia': tipologia,
+    'criadoEm': Timestamp.fromDate(criadoEm),
+  };
 }

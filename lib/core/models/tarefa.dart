@@ -3,18 +3,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class Tarefa {
   final String id;
   final String titulo;
+  final String tipo;
   final String propriedadeId;
-  final String status;
   final String responsavelId;
-  final DateTime criadoEm;
+  final String status;
+  final DateTime data;
+  final DateTime? concluidaEm;
+  final String? observacoes;
 
   Tarefa({
     required this.id,
     required this.titulo,
+    required this.tipo,
     required this.propriedadeId,
-    required this.status,
     required this.responsavelId,
-    required this.criadoEm,
+    required this.status,
+    required this.data,
+    this.concluidaEm,
+    this.observacoes,
   });
 
   factory Tarefa.fromFirestore(DocumentSnapshot doc) {
@@ -22,20 +28,26 @@ class Tarefa {
     return Tarefa(
       id: doc.id,
       titulo: data['titulo'] ?? '',
+      tipo: data['tipo'] ?? 'limpeza',
       propriedadeId: data['propriedadeId'] ?? '',
-      status: data['status'] ?? 'pendente',
       responsavelId: data['responsavelId'] ?? '',
-      criadoEm: (data['criadoEm'] as Timestamp).toDate(),
+      status: data['status'] ?? 'pendente',
+      data: (data['data'] as Timestamp).toDate(),
+      concluidaEm: data['concluidaEm'] != null
+          ? (data['concluidaEm'] as Timestamp).toDate()
+          : null,
+      observacoes: data['observacoes'],
     );
   }
 
-  Map<String, dynamic> toFirestore() {
-    return {
-      'titulo': titulo,
-      'propriedadeId': propriedadeId,
-      'status': status,
-      'responsavelId': responsavelId,
-      'criadoEm': Timestamp.fromDate(criadoEm),
-    };
-  }
+  Map<String, dynamic> toFirestore() => {
+    'titulo': titulo,
+    'tipo': tipo,
+    'propriedadeId': propriedadeId,
+    'responsavelId': responsavelId,
+    'status': status,
+    'data': Timestamp.fromDate(data),
+    if (concluidaEm != null) 'concluidaEm': Timestamp.fromDate(concluidaEm!),
+    if (observacoes != null) 'observacoes': observacoes,
+  };
 }
