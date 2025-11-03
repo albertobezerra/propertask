@@ -26,7 +26,6 @@ class _TarefasScreenState extends State<TarefasScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = Provider.of<AppState>(context).user!;
     final cargo = Provider.of<AppState>(context).usuario?.cargo ?? 'LIMPEZA';
     final podeEditar = Permissions.podeGerenciarPropriedades(cargo);
     final hoje = DateTime.now();
@@ -234,6 +233,9 @@ class _TarefasScreenState extends State<TarefasScreen> {
   }
 
   void _deleteTarefa(BuildContext context, String id) {
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -241,18 +243,35 @@ class _TarefasScreenState extends State<TarefasScreen> {
         content: const Text('Esta tarefa será removida permanentemente.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => navigator.pop(),
             child: const Text('Cancelar'),
           ),
           TextButton(
             onPressed: () async {
-              await FirebaseFirestore.instance
-                  .collection('propertask')
-                  .doc('tarefas')
-                  .collection('tarefas')
-                  .doc(id)
-                  .delete();
-              Navigator.pop(context);
+              try {
+                await FirebaseFirestore.instance
+                    .collection('propertask')
+                    .doc('tarefas')
+                    .collection('tarefas')
+                    .doc(id)
+                    .delete();
+
+                if (!mounted) return;
+
+                navigator.pop();
+                scaffoldMessenger.showSnackBar(
+                  const SnackBar(content: Text('Tarefa excluída')),
+                );
+              } catch (e) {
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Erro ao excluir: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Excluir', style: TextStyle(color: Colors.red)),
           ),

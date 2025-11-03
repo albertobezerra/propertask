@@ -12,12 +12,7 @@ class PropriedadeFormScreen extends StatefulWidget {
 
 class _PropriedadeFormScreenState extends State<PropriedadeFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nome,
-      _endereco,
-      _acesso,
-      _codigo,
-      _lockbox,
-      _tipologia;
+  late TextEditingController _nome, _endereco, _codigo, _lockbox, _tipologia;
   String _tipoAcesso = 'chave';
 
   @override
@@ -26,7 +21,6 @@ class _PropriedadeFormScreenState extends State<PropriedadeFormScreen> {
     final data = widget.propriedade?.data() as Map<String, dynamic>? ?? {};
     _nome = TextEditingController(text: data['nome'] ?? '');
     _endereco = TextEditingController(text: data['endereco'] ?? '');
-    _acesso = TextEditingController(text: data['acesso'] ?? '');
     _codigo = TextEditingController(text: data['codigoAcesso'] ?? '');
     _lockbox = TextEditingController(text: data['lockboxLocal'] ?? '');
     _tipologia = TextEditingController(text: data['tipologia'] ?? 'T1');
@@ -58,7 +52,7 @@ class _PropriedadeFormScreenState extends State<PropriedadeFormScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _tipoAcesso,
+              initialValue: _tipoAcesso,
               items: ['chave', 'codigo', 'lockbox']
                   .map(
                     (e) => DropdownMenuItem(
@@ -94,6 +88,10 @@ class _PropriedadeFormScreenState extends State<PropriedadeFormScreen> {
             ElevatedButton(
               onPressed: () async {
                 if (_formKey.currentState!.validate()) {
+                  // SALVA NAVIGATOR E SCAFFOLD ANTES DO AWAIT
+                  final navigator = Navigator.of(context);
+                  final scaffoldMessenger = ScaffoldMessenger.of(context);
+
                   final data = {
                     'nome': _nome.text,
                     'endereco': _endereco.text,
@@ -103,19 +101,32 @@ class _PropriedadeFormScreenState extends State<PropriedadeFormScreen> {
                         ? null
                         : _lockbox.text,
                     'tipologia': _tipologia.text,
-                    'fotos': [], // futuro
+                    'fotos': [],
                   };
 
-                  if (widget.propriedade == null) {
-                    await FirebaseFirestore.instance
-                        .collection('propertask')
-                        .doc('propriedades')
-                        .collection('propriedades')
-                        .add(data);
-                  } else {
-                    await widget.propriedade!.reference.update(data);
+                  try {
+                    if (widget.propriedade == null) {
+                      await FirebaseFirestore.instance
+                          .collection('propertask')
+                          .doc('propriedades')
+                          .collection('propriedades')
+                          .add(data);
+                    } else {
+                      await widget.propriedade!.reference.update(data);
+                    }
+
+                    if (!mounted) return;
+                    navigator.pop();
+                  } catch (e) {
+                    if (mounted) {
+                      scaffoldMessenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Erro ao salvar: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
-                  Navigator.pop(context);
                 }
               },
               child: Text(widget.propriedade == null ? 'Adicionar' : 'Salvar'),

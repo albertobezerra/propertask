@@ -64,6 +64,9 @@ class TarefaCard extends StatelessWidget {
   }
 
   void _confirmDelete(BuildContext context) {
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -71,22 +74,29 @@ class TarefaCard extends StatelessWidget {
         content: Text('Tem certeza que deseja excluir "${tarefa.titulo}"?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => navigator.pop(),
             child: const Text('Cancelar'),
           ),
           TextButton(
             onPressed: () async {
-              Navigator.pop(context);
+              navigator.pop();
+
               try {
                 await FirestoreService().deleteTarefa(tarefa.id);
+
+                if (!context.mounted) return;
+
                 if (onDelete != null) onDelete!();
-                ScaffoldMessenger.of(context).showSnackBar(
+
+                scaffoldMessenger.showSnackBar(
                   const SnackBar(content: Text('Tarefa excluída com sucesso')),
                 );
               } catch (e) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('Erro ao excluir: $e')));
+                if (context.mounted) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(content: Text('Erro ao excluir: $e')),
+                  );
+                }
               }
             },
             child: const Text('Excluir', style: TextStyle(color: Colors.red)),

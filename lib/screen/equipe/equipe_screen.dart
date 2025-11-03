@@ -195,16 +195,32 @@ class _EquipeScreenState extends State<EquipeScreen> {
   }
 
   void _toggleAtivo(BuildContext context, DocumentSnapshot doc) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     final data = doc.data() as Map<String, dynamic>;
     final novoAtivo = !(data['ativo'] == true);
 
-    await doc.reference.update({'ativo': novoAtivo});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          novoAtivo ? 'Funcionário ativado' : 'Funcionário desativado',
+    try {
+      await doc.reference.update({'ativo': novoAtivo});
+
+      if (!mounted) return;
+
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            novoAtivo ? 'Funcionário ativado' : 'Funcionário desativado',
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Erro ao atualizar status: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

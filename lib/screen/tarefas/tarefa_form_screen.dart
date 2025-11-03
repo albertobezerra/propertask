@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:propertask/main.dart';
-import 'package:provider/provider.dart';
-import 'package:propertask/core/providers/app_state.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class TarefaFormScreen extends StatefulWidget {
@@ -55,7 +53,7 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _tipo,
+              initialValue: _tipo,
               items: ['limpeza', 'entrega', 'recolha', 'manutencao']
                   .map(
                     (e) => DropdownMenuItem(
@@ -76,11 +74,12 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
                   .collection('propriedades')
                   .get(),
               builder: (context, snapshot) {
-                if (!snapshot.hasData)
+                if (!snapshot.hasData) {
                   return const Text('Carregando propriedades...');
+                }
                 final props = snapshot.data!.docs;
                 return DropdownButtonFormField<String>(
-                  value: _propriedadeId,
+                  initialValue: _propriedadeId,
                   hint: const Text('Selecione a propriedade'),
                   items: props.map((p) {
                     final nome = (p['nome'] ?? 'Sem nome');
@@ -99,11 +98,12 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
                   .collection('usuarios')
                   .get(),
               builder: (context, snapshot) {
-                if (!snapshot.hasData)
+                if (!snapshot.hasData) {
                   return const Text('Carregando usuários...');
+                }
                 final users = snapshot.data!.docs;
                 return DropdownButtonFormField<String>(
-                  value: _responsavelId,
+                  initialValue: _responsavelId,
                   hint: const Text('Atribuir a'),
                   items: users.map((u) {
                     final nome = (u['nome'] ?? 'Sem nome');
@@ -139,10 +139,14 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
                 if (_formKey.currentState!.validate() &&
                     _propriedadeId != null &&
                     _responsavelId != null) {
+                  final navigator = Navigator.of(context);
+                  final scaffoldMessenger = ScaffoldMessenger.of(context);
+
                   final ref = FirebaseFirestore.instance
                       .collection('propertask')
                       .doc('tarefas')
                       .collection('tarefas');
+
                   final propDoc = await FirebaseFirestore.instance
                       .collection('propertask')
                       .doc('propriedades')
@@ -164,13 +168,26 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
                         : _observacoes.text,
                   };
 
-                  if (widget.tarefa == null) {
-                    await ref.add(tarefaData);
-                    _showLocalNotification(_titulo.text, propNome);
-                  } else {
-                    await widget.tarefa!.reference.update(tarefaData);
+                  try {
+                    if (widget.tarefa == null) {
+                      await ref.add(tarefaData);
+                      _showLocalNotification(_titulo.text, propNome);
+                    } else {
+                      await widget.tarefa!.reference.update(tarefaData);
+                    }
+
+                    if (!mounted) return;
+                    navigator.pop();
+                  } catch (e) {
+                    if (mounted) {
+                      scaffoldMessenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Erro ao salvar tarefa: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
-                  Navigator.pop(context);
                 }
               },
               child: Text(widget.tarefa == null ? 'Criar Tarefa' : 'Salvar'),

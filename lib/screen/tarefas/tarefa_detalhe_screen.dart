@@ -47,20 +47,36 @@ class TarefaDetalheScreen extends StatelessWidget {
               if (podeEditar)
                 ElevatedButton(
                   onPressed: () async {
+                    final scaffoldMessenger = ScaffoldMessenger.of(context);
                     final novoStatus = data['status'] == 'concluida'
                         ? 'pendente'
                         : 'concluida';
-                    await snapshot.data!.reference.update({
-                      'status': novoStatus,
-                      'concluidaEm': novoStatus == 'concluida'
-                          ? FieldValue.serverTimestamp()
-                          : null,
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Status alterado para $novoStatus'),
-                      ),
-                    );
+
+                    try {
+                      await snapshot.data!.reference.update({
+                        'status': novoStatus,
+                        'concluidaEm': novoStatus == 'concluida'
+                            ? FieldValue.serverTimestamp()
+                            : null,
+                      });
+
+                      if (!context.mounted) return;
+
+                      scaffoldMessenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Status alterado para $novoStatus'),
+                        ),
+                      );
+                    } catch (e) {
+                      if (context.mounted) {
+                        scaffoldMessenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Erro ao atualizar: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
                   },
                   child: Text(
                     data['status'] == 'concluida'

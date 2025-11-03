@@ -122,10 +122,12 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
                       trailing: podeEditar
                           ? PopupMenuButton(
                               onSelected: (v) {
-                                if (v == 'edit')
+                                if (v == 'edit') {
                                   _editarObservacao(context, doc);
-                                if (v == 'delete')
+                                }
+                                if (v == 'delete') {
                                   _excluirPonto(context, doc.id);
+                                }
                               },
                               itemBuilder: (_) => [
                                 const PopupMenuItem(
@@ -151,7 +153,11 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
   }
 
   void _editarObservacao(BuildContext context, DocumentSnapshot doc) {
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     final controller = TextEditingController(text: doc['observacao'] ?? '');
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -162,15 +168,29 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => navigator.pop(),
             child: const Text('Cancelar'),
           ),
           TextButton(
             onPressed: () async {
-              await doc.reference.update({
-                'observacao': controller.text.isEmpty ? null : controller.text,
-              });
-              Navigator.pop(context);
+              try {
+                await doc.reference.update({
+                  'observacao': controller.text.isEmpty
+                      ? null
+                      : controller.text,
+                });
+                if (!mounted) return;
+                navigator.pop();
+              } catch (e) {
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Erro: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Salvar'),
           ),
@@ -180,6 +200,9 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
   }
 
   void _excluirPonto(BuildContext context, String id) {
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -187,18 +210,30 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
         content: const Text('Este registro será removido.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => navigator.pop(),
             child: const Text('Cancelar'),
           ),
           TextButton(
             onPressed: () async {
-              await FirebaseFirestore.instance
-                  .collection('propertask')
-                  .doc('ponto')
-                  .collection('registros')
-                  .doc(id)
-                  .delete();
-              Navigator.pop(context);
+              try {
+                await FirebaseFirestore.instance
+                    .collection('propertask')
+                    .doc('ponto')
+                    .collection('registros')
+                    .doc(id)
+                    .delete();
+                if (!mounted) return;
+                navigator.pop();
+              } catch (e) {
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Erro: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Excluir', style: TextStyle(color: Colors.red)),
           ),

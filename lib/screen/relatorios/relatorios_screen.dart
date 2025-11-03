@@ -234,17 +234,18 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
     final csv = [headers.join(','), ...rows].join('\n');
     final bytes = utf8.encode(csv);
 
-    final dir = await getTemporaryDirectory(); // CORRIGIDO
+    final dir = await getTemporaryDirectory();
     final file = File(
       '${dir.path}/relatorio_${DateTime.now().millisecondsSinceEpoch}.csv',
     );
     await file.writeAsBytes(bytes);
 
-    // NOVA API DO share_plus
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: 'Relatório de Tarefas Concluídas',
-      subject: 'Relatório Propertask',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path)],
+        text: 'Relatório de Tarefas Concluídas',
+        subject: 'Relatório Propertask',
+      ),
     );
   }
 }

@@ -25,7 +25,6 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = Provider.of<AppState>(context).user!;
     final cargo = Provider.of<AppState>(context).usuario?.cargo ?? 'LIMPEZA';
     final podeEditar = Permissions.podeGerenciarPropriedades(cargo);
 
@@ -155,6 +154,9 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
   }
 
   void _confirmDelete(BuildContext context, String id) {
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -162,21 +164,35 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
         content: const Text('Tem certeza que deseja excluir esta propriedade?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => navigator.pop(),
             child: const Text('Cancelar'),
           ),
           TextButton(
             onPressed: () async {
-              await FirebaseFirestore.instance
-                  .collection('propertask')
-                  .doc('propriedades')
-                  .collection('propriedades')
-                  .doc(id)
-                  .delete();
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Propriedade excluída')),
-              );
+              try {
+                await FirebaseFirestore.instance
+                    .collection('propertask')
+                    .doc('propriedades')
+                    .collection('propriedades')
+                    .doc(id)
+                    .delete();
+
+                if (!mounted) return;
+
+                navigator.pop();
+                scaffoldMessenger.showSnackBar(
+                  const SnackBar(content: Text('Propriedade excluída')),
+                );
+              } catch (e) {
+                if (mounted) {
+                  scaffoldMessenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Erro ao excluir: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Excluir', style: TextStyle(color: Colors.red)),
           ),

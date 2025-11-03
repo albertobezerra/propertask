@@ -97,31 +97,45 @@ class _PontoScreenState extends State<PontoScreen> {
       return;
     }
 
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final userId = Provider.of<AppState>(context, listen: false).user!.uid;
     final agora = DateTime.now();
     final arredondado = _arredondarHora(agora);
 
-    await FirebaseFirestore.instance
-        .collection('propertask')
-        .doc('ponto')
-        .collection('registros')
-        .add({
-          'usuarioId': userId,
-          'tipo': tipo,
-          'horarioReal': Timestamp.fromDate(agora),
-          'horarioArredondado': Timestamp.fromDate(arredondado),
-          'localizacao': GeoPoint(_position!.latitude, _position!.longitude),
-          'observacao': null,
-        });
+    try {
+      await FirebaseFirestore.instance
+          .collection('propertask')
+          .doc('ponto')
+          .collection('registros')
+          .add({
+            'usuarioId': userId,
+            'tipo': tipo,
+            'horarioReal': Timestamp.fromDate(agora),
+            'horarioArredondado': Timestamp.fromDate(arredondado),
+            'localizacao': GeoPoint(_position!.latitude, _position!.longitude),
+            'observacao': null,
+          });
 
-    setState(() {
-      _ultimoPonto = tipo;
-      _status = '$tipo batido às ${DateFormat('HH:mm').format(agora)}';
-    });
+      if (!mounted) return;
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$tipo registrado com sucesso!')));
+      setState(() {
+        _ultimoPonto = tipo;
+        _status = '$tipo batido às ${DateFormat('HH:mm').format(agora)}';
+      });
+
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('$tipo registrado com sucesso!')),
+      );
+    } catch (e) {
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Erro ao registrar ponto: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   DateTime _arredondarHora(DateTime hora) {

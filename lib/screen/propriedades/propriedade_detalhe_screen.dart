@@ -18,8 +18,9 @@ class PropriedadeDetalheScreen extends StatelessWidget {
             .doc(propriedadeId)
             .get(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
           final data = snapshot.data!.data() as Map<String, dynamic>;
 
           return ListView(

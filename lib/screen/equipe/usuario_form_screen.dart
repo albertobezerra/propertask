@@ -61,7 +61,7 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
               ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _cargo,
+              initialValue: _cargo,
               items: [
                 'DEV',
                 'CEO',
@@ -83,6 +83,9 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
             ElevatedButton(
               onPressed: () async {
                 if (_formKey.currentState!.validate()) {
+                  final navigator = Navigator.of(context);
+                  final scaffoldMessenger = ScaffoldMessenger.of(context);
+
                   try {
                     final usuariosRef = FirebaseFirestore.instance
                         .collection('propertask')
@@ -90,7 +93,6 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
                         .collection('usuarios');
 
                     if (!isEdit) {
-                      // Criar usuário no Firebase Auth
                       final cred = await auth.FirebaseAuth.instance
                           .createUserWithEmailAndPassword(
                             email: _email.text,
@@ -103,7 +105,6 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
                         'ativo': _ativo,
                       });
                     } else {
-                      // Atualizar apenas Firestore
                       await widget.usuario!.reference.update({
                         'nome': _nome.text,
                         'email': _email.text,
@@ -111,11 +112,18 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
                         'ativo': _ativo,
                       });
                     }
-                    Navigator.pop(context);
+
+                    if (!mounted) return;
+                    navigator.pop();
                   } catch (e) {
-                    ScaffoldMessenger.of(
-                      context,
-                    ).showSnackBar(SnackBar(content: Text('Erro: $e')));
+                    if (mounted) {
+                      scaffoldMessenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Erro: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
                 }
               },

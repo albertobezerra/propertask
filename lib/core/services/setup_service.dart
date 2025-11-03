@@ -60,7 +60,7 @@ class SetupService {
   }
 
   Future<void> _applyMigration(int version) async {
-    final basePath = '$_rootCollection';
+    final basePath = _rootCollection;
 
     switch (version) {
       case 1:
