@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:propertask/screen/equipe/usuario_form_screen.dart';
+import 'package:propertask/widgets/app_drawer.dart';
 import 'package:provider/provider.dart';
 import 'package:propertask/core/providers/app_state.dart';
 import 'package:propertask/core/utils/permissions.dart';
@@ -30,24 +31,36 @@ class _EquipeScreenState extends State<EquipeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Equipe'),
+        centerTitle: true,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         actions: [
           if (podeEditar)
             IconButton(
               icon: const Icon(Icons.add),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const UsuarioFormScreen()),
-              ),
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const UsuarioFormScreen()),
+                );
+                if (!mounted) return;
+                if (result == true) setState(() {});
+              },
             ),
         ],
       ),
+      drawer: const AppDrawer(currentRoute: '/equipe'),
       body: Column(
         children: [
-          // BUSCA
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
               controller: _searchController,
+              textCapitalization: TextCapitalization.words,
               decoration: InputDecoration(
                 hintText: 'Buscar funcionário...',
                 prefixIcon: const Icon(Icons.search),
@@ -58,7 +71,6 @@ class _EquipeScreenState extends State<EquipeScreen> {
               onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
             ),
           ),
-          // LISTA
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
@@ -129,7 +141,10 @@ class _EquipeScreenState extends State<EquipeScreen> {
                                         builder: (_) =>
                                             UsuarioFormScreen(usuario: doc),
                                       ),
-                                    );
+                                    ).then((_) {
+                                      if (!mounted) return;
+                                      setState(() {});
+                                    });
                                   } else if (v == 'toggle') {
                                     _toggleAtivo(context, doc);
                                   }
@@ -159,68 +174,44 @@ class _EquipeScreenState extends State<EquipeScreen> {
   }
 
   String _formatCargo(String cargo) {
-    switch (cargo) {
-      case 'DEV':
-        return 'Desenvolvedor';
-      case 'CEO':
-        return 'CEO';
-      case 'COORDENADOR':
-        return 'Coordenador';
-      case 'SUPERVISOR':
-        return 'Supervisor';
-      case 'LIMPEZA':
-        return 'Limpeza';
-      case 'LAVANDERIA':
-        return 'Lavanderia';
-      case 'MOTORISTA':
-        return 'Motorista';
-      default:
-        return cargo;
-    }
+    const map = {
+      'DEV': 'Desenvolvedor',
+      'CEO': 'CEO',
+      'COORDENADOR': 'Coordenador',
+      'SUPERVISOR': 'Supervisor',
+      'LIMPEZA': 'Limpeza',
+      'LAVANDERIA': 'Lavanderia',
+      'MOTORISTA': 'Motorista',
+    };
+    return map[cargo] ?? cargo;
   }
 
   Color _getCargoColor(String cargo) {
-    switch (cargo) {
-      case 'DEV':
-        return Colors.purple;
-      case 'CEO':
-        return Colors.red;
-      case 'COORDENADOR':
-        return Colors.orange;
-      case 'SUPERVISOR':
-        return Colors.blue;
-      default:
-        return Colors.grey;
-    }
+    const map = {
+      'DEV': Colors.purple,
+      'CEO': Colors.red,
+      'COORDENADOR': Colors.orange,
+      'SUPERVISOR': Colors.blue,
+    };
+    return map[cargo] ?? Colors.grey;
   }
 
   void _toggleAtivo(BuildContext context, DocumentSnapshot doc) async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-
+    final ctx = context; // ← SALVA ANTES DO AWAIT
     final data = doc.data() as Map<String, dynamic>;
     final novoAtivo = !(data['ativo'] == true);
 
     try {
       await doc.reference.update({'ativo': novoAtivo});
-
-      if (!mounted) return;
-
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            novoAtivo ? 'Funcionário ativado' : 'Funcionário desativado',
-          ),
-        ),
+      if (!ctx.mounted) return; // ← VERIFICA O MESMO CONTEXT
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(content: Text(novoAtivo ? 'Ativado' : 'Desativado')),
       );
     } catch (e) {
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text('Erro ao atualizar status: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!ctx.mounted) return;
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 }

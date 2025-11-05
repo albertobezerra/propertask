@@ -1,20 +1,28 @@
+// lib/core/services/auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:propertask/core/providers/app_state.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  Future<bool> login({required String email, required String password}) async {
+  // LOGIN
+  static Future<bool> login(String email, String password) async {
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
       return true;
     } catch (e) {
-      debugPrint('❌ Erro ao fazer login: $e');
+      debugPrint('ERRO LOGIN: $e');
       return false;
     }
   }
 
-  Future<void> logout() async {
-    await _auth.signOut();
+  // LOGOUT
+  static Future<void> logout(BuildContext context) async {
+    final appState = Provider.of<AppState>(context, listen: false);
+    appState.limpar();
+    await FirebaseAuth.instance.signOut();
   }
 }

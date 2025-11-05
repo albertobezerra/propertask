@@ -1,10 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart' as auth;
 
 class UsuarioFormScreen extends StatefulWidget {
   final DocumentSnapshot? usuario;
-
   const UsuarioFormScreen({super.key, this.usuario});
 
   @override
@@ -13,7 +12,7 @@ class UsuarioFormScreen extends StatefulWidget {
 
 class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nome, _email, _senha;
+  late TextEditingController _nome, _email;
   String _cargo = 'LIMPEZA';
   bool _ativo = true;
 
@@ -23,9 +22,15 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
     final data = widget.usuario?.data() as Map<String, dynamic>? ?? {};
     _nome = TextEditingController(text: data['nome'] ?? '');
     _email = TextEditingController(text: data['email'] ?? '');
-    _senha = TextEditingController();
     _cargo = data['cargo'] ?? 'LIMPEZA';
-    _ativo = data['ativo'] == true;
+    _ativo = data['ativo'] != false;
+  }
+
+  @override
+  void dispose() {
+    _nome.dispose();
+    _email.dispose();
+    super.dispose();
   }
 
   @override
@@ -34,7 +39,8 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEdit ? 'Editar Funcionário' : 'Novo Funcionário'),
+        title: Text(isEdit ? 'Editar Funcionário' : 'Convidar Funcionário'),
+        centerTitle: true,
       ),
       body: Form(
         key: _formKey,
@@ -43,95 +49,150 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
           children: [
             TextFormField(
               controller: _nome,
-              decoration: const InputDecoration(labelText: 'Nome *'),
-              validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Nome completo *',
+                prefixIcon: Icon(Icons.person),
+              ),
+              validator: (v) => v!.trim().isEmpty ? 'Digite o nome' : null,
             ),
+            const SizedBox(height: 16),
             TextFormField(
               controller: _email,
-              decoration: const InputDecoration(labelText: 'Email *'),
               keyboardType: TextInputType.emailAddress,
-              validator: (v) => v!.isEmpty ? 'Obrigatório' : null,
-            ),
-            if (!isEdit)
-              TextFormField(
-                controller: _senha,
-                decoration: const InputDecoration(labelText: 'Senha *'),
-                obscureText: true,
-                validator: (v) => v!.length < 6 ? 'Mínimo 6 caracteres' : null,
+              decoration: const InputDecoration(
+                labelText: 'E-mail *',
+                prefixIcon: Icon(Icons.email),
               ),
+              validator: (v) => v!.contains('@') ? null : 'E-mail inválido',
+            ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               initialValue: _cargo,
-              items: [
-                'DEV',
-                'CEO',
-                'COORDENADOR',
-                'SUPERVISOR',
-                'LIMPEZA',
-                'LAVANDERIA',
-                'MOTORISTA',
-              ].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+              items:
+                  [
+                        'LIMPEZA',
+                        'LAVANDERIA',
+                        'MOTORISTA',
+                        'SUPERVISOR',
+                        'COORDENADOR',
+                        'CEO',
+                        'DEV',
+                      ]
+                      .map(
+                        (c) => DropdownMenuItem(
+                          value: c,
+                          child: Text(_formatCargo(c)),
+                        ),
+                      )
+                      .toList(),
               onChanged: (v) => setState(() => _cargo = v!),
-              decoration: const InputDecoration(labelText: 'Cargo'),
+              decoration: const InputDecoration(
+                labelText: 'Cargo',
+                prefixIcon: Icon(Icons.work),
+              ),
             ),
-            SwitchListTile(
-              title: const Text('Ativo'),
-              value: _ativo,
-              onChanged: (v) => setState(() => _ativo = v),
+            const SizedBox(height: 16),
+            Card(
+              child: SwitchListTile(
+                title: const Text('Status do Usuário'),
+                subtitle: Text(
+                  _ativo ? 'Ativo (pode logar)' : 'Inativo (bloqueado)',
+                ),
+                value: _ativo,
+                onChanged: (v) => setState(() => _ativo = v),
+              ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () async {
-                if (_formKey.currentState!.validate()) {
-                  final navigator = Navigator.of(context);
-                  final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-                  try {
-                    final usuariosRef = FirebaseFirestore.instance
-                        .collection('propertask')
-                        .doc('usuarios')
-                        .collection('usuarios');
-
-                    if (!isEdit) {
-                      final cred = await auth.FirebaseAuth.instance
-                          .createUserWithEmailAndPassword(
-                            email: _email.text,
-                            password: _senha.text,
-                          );
-                      await usuariosRef.doc(cred.user!.uid).set({
-                        'nome': _nome.text,
-                        'email': _email.text,
-                        'cargo': _cargo,
-                        'ativo': _ativo,
-                      });
-                    } else {
-                      await widget.usuario!.reference.update({
-                        'nome': _nome.text,
-                        'email': _email.text,
-                        'cargo': _cargo,
-                        'ativo': _ativo,
-                      });
-                    }
-
-                    if (!mounted) return;
-                    navigator.pop();
-                  } catch (e) {
-                    if (mounted) {
-                      scaffoldMessenger.showSnackBar(
-                        SnackBar(
-                          content: Text('Erro: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                }
-              },
-              child: Text(isEdit ? 'Salvar' : 'Criar Funcionário'),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.send),
+              label: Text(isEdit ? 'Salvar Alterações' : 'Enviar Convite'),
+              onPressed: () => _salvar(context, isEdit),
             ),
           ],
         ),
       ),
     );
+  }
+
+  String _formatCargo(String cargo) {
+    const map = {
+      'DEV': 'Desenvolvedor',
+      'CEO': 'CEO',
+      'COORDENADOR': 'Coordenador',
+      'SUPERVISOR': 'Supervisor',
+      'LIMPEZA': 'Limpeza',
+      'LAVANDERIA': 'Lavanderia',
+      'MOTORISTA': 'Motorista',
+    };
+    return map[cargo] ?? cargo;
+  }
+
+  String _gerarSenhaTemporaria() {
+    return DateTime.now().millisecondsSinceEpoch.toString().substring(7);
+  }
+
+  Future<void> _salvar(BuildContext context, bool isEdit) async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      final usuariosRef = FirebaseFirestore.instance
+          .collection('propertask')
+          .doc('usuarios')
+          .collection('usuarios');
+
+      if (!isEdit) {
+        final tempPassword = _gerarSenhaTemporaria();
+
+        // 1. CRIAR USUÁRIO NOVO (admin continua logado)
+        final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: _email.text.trim(),
+          password: tempPassword,
+        );
+
+        // 2. SALVAR PERFIL NO FIRESTORE
+        await usuariosRef.doc(cred.user!.uid).set({
+          'nome': _nome.text.trim(),
+          'email': _email.text.trim(),
+          'cargo': _cargo,
+          'ativo': _ativo,
+          'criadoPor': FirebaseAuth.instance.currentUser!.uid,
+          'criadoEm': FieldValue.serverTimestamp(),
+        });
+
+        // 3. ENVIAR EMAIL DE RESET (usuário cria própria senha)
+        await FirebaseAuth.instance.sendPasswordResetEmail(
+          email: _email.text.trim(),
+        );
+
+        // 4. FEEDBACK DE SUCESSO
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Convite enviado para ${_email.text}!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // 5. VOLTA PARA TELA DE EQUIPE (sem recarregar app)
+        navigator.pop(); // Volta para EquipeScreen
+      } else {
+        // EDIÇÃO
+        await widget.usuario!.reference.update({
+          'nome': _nome.text.trim(),
+          'email': _email.text.trim(),
+          'cargo': _cargo,
+          'ativo': _ativo,
+        });
+        messenger.showSnackBar(const SnackBar(content: Text('Atualizado!')));
+        navigator.pop();
+      }
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 }

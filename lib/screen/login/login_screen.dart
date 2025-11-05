@@ -11,42 +11,28 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _senha = TextEditingController();
-  final _auth = AuthService();
   bool _loading = false;
 
   Future<void> _login() async {
     if (_loading) return;
-
     setState(() => _loading = true);
 
-    try {
-      final success = await _auth.login(
-        email: _email.text.trim(),
-        password: _senha.text,
-      );
+    final success = await AuthService.login(_email.text.trim(), _senha.text);
 
-      if (!success) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Email ou senha incorretos'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-      // Se sucesso, userChanges() vai redirecionar automaticamente
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
+    if (!success) {
+      _showError('Email ou senha incorretos');
+    } else {
+      debugPrint('LOGIN SUCESSO - Aguardando AuthWrapper');
+    }
+
+    if (mounted) setState(() => _loading = false);
+  }
+
+  void _showError(String msg) {
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
     }
   }
 
@@ -63,39 +49,20 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // LOGO (OPCIONAL)
             const Icon(Icons.cleaning_services, size: 80, color: Colors.blue),
             const SizedBox(height: 40),
-
-            // EMAIL
             TextField(
               controller: _email,
               keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                labelText: 'Email',
-                prefixIcon: const Icon(Icons.email),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+              decoration: _inputDecoration('Email', Icons.email),
             ),
             const SizedBox(height: 16),
-
-            // SENHA
             TextField(
               controller: _senha,
               obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Senha',
-                prefixIcon: const Icon(Icons.lock),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+              decoration: _inputDecoration('Senha', Icons.lock),
             ),
             const SizedBox(height: 30),
-
-            // BOTÃO
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -125,6 +92,14 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 

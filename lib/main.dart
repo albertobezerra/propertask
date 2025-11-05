@@ -1,4 +1,6 @@
 // lib/main.dart
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -33,6 +35,7 @@ void main() async {
 
 class PropertaskApp extends StatelessWidget {
   const PropertaskApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -45,53 +48,55 @@ class PropertaskApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+//
+// ✅ NOVO AUTHWRAPPER — 100% funcional e sem erros
+//
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
   @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  StreamSubscription? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final appState = Provider.of<AppState>(context, listen: false);
+
+    // OUVIR APENAS UMA VEZ
+    _sub = FirebaseAuth.instance.authStateChanges().listen((user) async {
+      if (!mounted) return;
+
+      appState.setUser(user);
+
+      if (user != null) {
+        await appState.carregarPerfil(user);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.userChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
+    final appState = context.watch<AppState>();
 
-        final user = snapshot.data;
+    if (appState.user == null) {
+      return const LoginScreen();
+    }
 
-        if (user != null) {
-          final appState = Provider.of<AppState>(context, listen: false);
-          if (appState.user == null) {
-            appState.setUser(user);
-          }
+    if (appState.usuario == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
-          return Consumer<AppState>(
-            builder: (context, appState, child) {
-              if (appState.user != null && appState.usuario != null) {
-                return const DashboardScreen();
-              }
-              return const Scaffold(
-                body: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text('Carregando perfil...'),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        }
-
-        // LIMPA AppState NO LOGOUT
-        Provider.of<AppState>(context, listen: false).setUser(null);
-        return const LoginScreen();
-      },
-    );
+    return const DashboardScreen();
   }
 }

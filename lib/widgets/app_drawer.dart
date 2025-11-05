@@ -1,7 +1,6 @@
 // lib/widgets/app_drawer.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // ADICIONE
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:propertask/core/services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:propertask/core/providers/app_state.dart';
 import 'package:propertask/core/utils/permissions.dart';
@@ -14,7 +13,6 @@ import 'package:propertask/screen/ponto/ponto_screen.dart';
 import 'package:propertask/screen/lavanderia/lavanderia_screen.dart';
 import 'package:propertask/screen/equipe/equipe_screen.dart';
 
-// lib/widgets/app_drawer.dart
 class AppDrawer extends StatelessWidget {
   final String currentRoute;
   const AppDrawer({super.key, required this.currentRoute});
@@ -137,14 +135,16 @@ class AppDrawer extends StatelessWidget {
               ),
 
               const Divider(),
+
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
                 title: const Text('Sair', style: TextStyle(color: Colors.red)),
                 onTap: () async {
-                  SystemChannels.textInput.invokeMethod('TextInput.hide');
-                  await Future.delayed(const Duration(milliseconds: 100));
-                  await FirebaseAuth.instance.signOut();
-                  // AppState será limpo no AuthWrapper
+                  Navigator.pop(context); // fecha drawer
+                  Navigator.of(
+                    context,
+                  ).popUntil((route) => route.isFirst); // volta ao AuthWrapper
+                  await AuthService.logout(context);
                 },
               ),
             ],
@@ -165,12 +165,11 @@ class AppDrawer extends StatelessWidget {
       leading: Icon(icon),
       title: Text(title),
       onTap: () {
-        Navigator.pop(context);
+        Navigator.pop(context); // fecha drawer
+
+        // ✅ Não usar pushReplacement
         if (ModalRoute.of(context)?.settings.name != route) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => screen),
-          );
+          Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
         }
       },
     );

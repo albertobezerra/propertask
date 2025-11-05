@@ -7,16 +7,20 @@ import 'package:propertask/core/models/usuario.dart';
 class AppState with ChangeNotifier {
   User? _user;
   Usuario? _usuario;
-  bool _isDarkMode = false;
 
   User? get user => _user;
   Usuario? get usuario => _usuario;
-  bool get isDarkMode => _isDarkMode;
 
-  // MUDANÇA AQUI: Future<void>
-  Future<void> setUser(User? user) async {
+  void setUser(User? user) {
     _user = user;
-    if (user != null) {
+    notifyListeners();
+  }
+
+  Future<void> carregarPerfil(User user) async {
+    _usuario = null;
+    notifyListeners();
+
+    try {
       final doc = await FirebaseFirestore.instance
           .collection('propertask')
           .doc('usuarios')
@@ -24,15 +28,21 @@ class AppState with ChangeNotifier {
           .doc(user.uid)
           .get();
 
-      _usuario = doc.exists ? Usuario.fromFirestore(doc) : null;
-    } else {
+      if (doc.exists) {
+        _usuario = Usuario.fromFirestore(doc);
+      } else {
+        _usuario = null;
+      }
+    } catch (_) {
       _usuario = null;
     }
+
     notifyListeners();
   }
 
-  void toggleDarkMode() {
-    _isDarkMode = !_isDarkMode;
+  void limpar() {
+    _user = null;
+    _usuario = null;
     notifyListeners();
   }
 }
