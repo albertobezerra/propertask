@@ -1,6 +1,5 @@
 // lib/main.dart
 import 'dart:async';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -10,6 +9,8 @@ import 'package:propertask/screen/dashboard/dashboard_screen.dart';
 import 'package:propertask/screen/login/login_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:propertask/core/providers/app_state.dart';
+// IMPORT OFICIAL DAS LOCALIZAÇÕES
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 final FlutterLocalNotificationsPlugin notifications =
     FlutterLocalNotificationsPlugin();
@@ -42,6 +43,17 @@ class PropertaskApp extends StatelessWidget {
       title: 'Propertask',
       theme: ThemeData.light(),
       darkTheme: ThemeData.dark(),
+      // Delegates de localização oficiais
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate, // textos/material widgets
+        GlobalWidgetsLocalizations.delegate, // direções/formatos
+        GlobalCupertinoLocalizations.delegate, // componentes iOS
+      ], // [web:150]
+      // Idiomas suportados pelo app
+      supportedLocales: const [
+        Locale('pt', 'BR'),
+        Locale('en', 'US'),
+      ], // [web:166]
       home: const AuthWrapper(),
       debugShowCheckedModeBanner: false,
     );
@@ -50,7 +62,6 @@ class PropertaskApp extends StatelessWidget {
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
-
   @override
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
@@ -67,14 +78,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
     _sub = FirebaseAuth.instance.authStateChanges().listen(
       (user) async {
         if (!mounted) return;
-
         appState.setUser(user);
         if (user != null) {
           await appState.carregarPerfil(user);
         }
-        if (mounted && !_authReady) {
-          setState(() => _authReady = true);
-        }
+        if (mounted && !_authReady) setState(() => _authReady = true);
       },
       onError: (_) {
         if (mounted && !_authReady) setState(() => _authReady = true);
@@ -92,20 +100,16 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
 
-    // Evita cair na Login antes do Firebase reemitir a sessão persistida
     if (!_authReady) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-
     if (appState.user == null) {
       return const LoginScreen();
     }
-
     if (appState.usuario == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // BLOQUEIO DE CONTA INATIVA (sem signOut automático)
     if (appState.usuario!.ativo != true) {
       return Scaffold(
         appBar: AppBar(
