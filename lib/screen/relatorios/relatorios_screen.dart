@@ -6,8 +6,9 @@ import 'package:provider/provider.dart';
 import 'package:propertask/core/providers/app_state.dart';
 import 'package:propertask/core/utils/permissions.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart'; // ADICIONADO
-import 'package:share_plus/share_plus.dart'; // OK
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:propertask/widgets/app_drawer.dart'; // IMPORT DO DRAWER
 
 class RelatoriosScreen extends StatefulWidget {
   const RelatoriosScreen({super.key});
@@ -72,6 +73,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
       });
     }
 
+    if (!mounted) return;
     setState(() => _tarefasConcluidas = tarefas);
   }
 
@@ -82,7 +84,19 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
 
     if (!podeVer) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Relatórios')),
+        appBar: AppBar(
+          title: const Text('Relatórios'),
+          backgroundColor: Colors.blue.shade700, // PADRÃO VISUAL
+          foregroundColor: Colors.white,
+          leading: Builder(
+            builder: (context) => IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+              tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+            ),
+          ), // LEADING QUE ABRE O DRAWER
+        ),
+        drawer: const AppDrawer(currentRoute: '/relatorios'), // DRAWER PADRÃO
         body: const Center(
           child: Text('Acesso restrito a supervisores e superiores.'),
         ),
@@ -97,6 +111,15 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Relatórios'),
+        backgroundColor: Colors.blue.shade700, // PADRÃO VISUAL
+        foregroundColor: Colors.white,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+            tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+          ),
+        ), // LEADING QUE ABRE O DRAWER
         actions: [
           IconButton(
             icon: const Icon(Icons.date_range),
@@ -107,6 +130,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
                 lastDate: DateTime.now(),
                 initialDateRange: _dateRange,
               );
+              if (!mounted) return;
               if (picked != null) {
                 setState(() => _dateRange = picked);
                 _loadRelatorio();
@@ -116,6 +140,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
           IconButton(icon: const Icon(Icons.share), onPressed: _exportCSV),
         ],
       ),
+      drawer: const AppDrawer(currentRoute: '/relatorios'), // DRAWER PADRÃO
       body: Column(
         children: [
           Card(
@@ -205,7 +230,6 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
     }
   }
 
-  // CORRIGIDO: Exportar CSV com nova API
   Future<void> _exportCSV() async {
     if (_tarefasConcluidas.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

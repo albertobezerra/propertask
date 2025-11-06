@@ -1,3 +1,4 @@
+// lib/screen/ponto/ponto_screen.dart
 import 'package:flutter/material.dart';
 import 'package:propertask/screen/ponto/ponto_historico_screen.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,7 @@ import 'package:propertask/core/utils/permissions.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:propertask/widgets/app_drawer.dart';
 
 class PontoScreen extends StatefulWidget {
   const PontoScreen({super.key});
@@ -32,12 +34,14 @@ class _PontoScreenState extends State<PontoScreen> {
     final podeBater = ['LIMPEZA', 'LAVANDERIA', 'MOTORISTA'].contains(cargo);
 
     if (!podeBater) {
+      if (!mounted) return;
       setState(() => _status = 'Você não precisa bater ponto.');
       return;
     }
 
     final permitted = await Geolocator.isLocationServiceEnabled();
     if (!permitted) {
+      if (!mounted) return;
       setState(() => _status = 'GPS desativado.');
       return;
     }
@@ -48,6 +52,7 @@ class _PontoScreenState extends State<PontoScreen> {
     }
 
     if (permission == LocationPermission.deniedForever) {
+      if (!mounted) return;
       setState(() => _status = 'Permissão de GPS negada.');
       return;
     }
@@ -76,6 +81,8 @@ class _PontoScreenState extends State<PontoScreen> {
         .limit(1)
         .get();
 
+    if (!mounted) return;
+
     if (snapshot.docs.isNotEmpty) {
       final data = snapshot.docs.first.data();
       final tipo = data['tipo'] as String;
@@ -91,9 +98,10 @@ class _PontoScreenState extends State<PontoScreen> {
 
   Future<void> _baterPonto(String tipo) async {
     if (_position == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('GPS não disponível')));
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('GPS não disponível')),
+      );
       return;
     }
 
@@ -127,14 +135,13 @@ class _PontoScreenState extends State<PontoScreen> {
         SnackBar(content: Text('$tipo registrado com sucesso!')),
       );
     } catch (e) {
-      if (mounted) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text('Erro ao registrar ponto: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text('Erro ao registrar ponto: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -166,17 +173,31 @@ class _PontoScreenState extends State<PontoScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ponto'),
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         actions: [
           if (podeVerHistorico)
             IconButton(
               icon: const Icon(Icons.history),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const PontoHistoricoScreen()),
-              ),
+              onPressed: () {
+                final navigator = Navigator.of(context);
+                navigator.push(
+                  MaterialPageRoute(
+                    builder: (_) => const PontoHistoricoScreen(),
+                  ),
+                );
+              },
             ),
         ],
       ),
+      drawer: const AppDrawer(currentRoute: '/ponto'),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -233,7 +254,7 @@ class _PontoScreenState extends State<PontoScreen> {
                     ),
                   ],
                 ),
-              ] else if (!podeVerHistorico)
+              ] else
                 const Text('Você não precisa bater ponto.'),
             ],
           ),
