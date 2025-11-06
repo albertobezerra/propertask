@@ -1,10 +1,20 @@
+// lib/screen/equipe/usuario_form_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 class UsuarioFormScreen extends StatefulWidget {
   final DocumentSnapshot? usuario;
-  const UsuarioFormScreen({super.key, this.usuario});
+  final String adminEmail;
+  final String adminPassword;
+
+  const UsuarioFormScreen({
+    super.key,
+    this.usuario,
+    required this.adminEmail,
+    required this.adminPassword,
+  });
 
   @override
   State<UsuarioFormScreen> createState() => _UsuarioFormScreenState();
@@ -41,6 +51,8 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
       appBar: AppBar(
         title: Text(isEdit ? 'Editar Funcionário' : 'Convidar Funcionário'),
         centerTitle: true,
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
       ),
       body: Form(
         key: _formKey,
@@ -70,7 +82,7 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
             DropdownButtonFormField<String>(
               initialValue: _cargo,
               items:
-                  [
+                  const [
                         'LIMPEZA',
                         'LAVANDERIA',
                         'MOTORISTA',
@@ -78,11 +90,12 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
                         'COORDENADOR',
                         'CEO',
                         'DEV',
+                        'RH',
                       ]
                       .map(
                         (c) => DropdownMenuItem(
                           value: c,
-                          child: Text(_formatCargo(c)),
+                          child: Text(_formatCargoStatic(c)),
                         ),
                       )
                       .toList(),
@@ -108,6 +121,9 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
               icon: const Icon(Icons.send),
               label: Text(isEdit ? 'Salvar Alterações' : 'Enviar Convite'),
               onPressed: () => _salvar(context, isEdit),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade700,
+              ),
             ),
           ],
         ),
@@ -115,7 +131,7 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
     );
   }
 
-  String _formatCargo(String cargo) {
+  static String _formatCargoStatic(String cargo) {
     const map = {
       'DEV': 'Desenvolvedor',
       'CEO': 'CEO',
@@ -124,6 +140,7 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
       'LIMPEZA': 'Limpeza',
       'LAVANDERIA': 'Lavanderia',
       'MOTORISTA': 'Motorista',
+      'RH': 'RH',
     };
     return map[cargo] ?? cargo;
   }
@@ -135,6 +152,7 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
   Future<void> _salvar(BuildContext context, bool isEdit) async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Capture as dependências do context antes dos awaits
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
 
@@ -147,28 +165,42 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
       if (!isEdit) {
         final tempPassword = _gerarSenhaTemporaria();
 
-        // 1. CRIAR USUÁRIO NOVO (admin continua logado)
-        final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: _email.text.trim(),
-          password: tempPassword,
+        // App secundária para evitar troca de sessão
+        final String appName =
+            'invite-${DateTime.now().microsecondsSinceEpoch}';
+        final FirebaseApp secondaryApp = await Firebase.initializeApp(
+          name: appName,
+          options: Firebase.app().options,
         );
 
-        // 2. SALVAR PERFIL NO FIRESTORE
-        await usuariosRef.doc(cred.user!.uid).set({
-          'nome': _nome.text.trim(),
-          'email': _email.text.trim(),
-          'cargo': _cargo,
-          'ativo': _ativo,
-          'criadoPor': FirebaseAuth.instance.currentUser!.uid,
-          'criadoEm': FieldValue.serverTimestamp(),
-        });
+        try {
+          final FirebaseAuth secondaryAuth = FirebaseAuth.instanceFor(
+            app: secondaryApp,
+          );
 
-        // 3. ENVIAR EMAIL DE RESET (usuário cria própria senha)
-        await FirebaseAuth.instance.sendPasswordResetEmail(
-          email: _email.text.trim(),
-        );
+          final cred = await secondaryAuth.createUserWithEmailAndPassword(
+            email: _email.text.trim(),
+            password: tempPassword,
+          );
 
-        // 4. FEEDBACK DE SUCESSO
+          final String novoUserId = cred.user!.uid;
+
+          await usuariosRef.doc(novoUserId).set({
+            'nome': _nome.text.trim(),
+            'email': _email.text.trim(),
+            'cargo': _cargo,
+            'ativo': _ativo,
+            'criadoPor': widget.adminEmail,
+            'criadoEm': FieldValue.serverTimestamp(),
+          });
+
+          await secondaryAuth.sendPasswordResetEmail(email: _email.text.trim());
+        } finally {
+          await secondaryApp.delete();
+        }
+
+        if (!context.mounted) return; // guarda o uso do context
+
         messenger.showSnackBar(
           SnackBar(
             content: Text('Convite enviado para ${_email.text}!'),
@@ -176,20 +208,31 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
           ),
         );
 
-        // 5. VOLTA PARA TELA DE EQUIPE (sem recarregar app)
-        navigator.pop(); // Volta para EquipeScreen
+        navigator.pop(true);
       } else {
-        // EDIÇÃO
         await widget.usuario!.reference.update({
           'nome': _nome.text.trim(),
           'email': _email.text.trim(),
           'cargo': _cargo,
           'ativo': _ativo,
         });
+
+        if (!context.mounted) return;
+
         messenger.showSnackBar(const SnackBar(content: Text('Atualizado!')));
-        navigator.pop();
+
+        navigator.pop(true);
       }
+    } on FirebaseAuthException catch (e) {
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Erro de autenticação: ${e.code}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } catch (e) {
+      if (!context.mounted) return;
       messenger.showSnackBar(
         SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
       );

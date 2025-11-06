@@ -1,6 +1,8 @@
 // lib/screen/login/login_screen.dart
 import 'package:flutter/material.dart';
 import 'package:propertask/core/services/auth_service.dart';
+import 'package:provider/provider.dart';
+import 'package:propertask/core/providers/app_state.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,23 +19,30 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_loading) return;
     setState(() => _loading = true);
 
+    // Capture dependências antes do await para evitar o lint de contexto
+    final messenger = ScaffoldMessenger.of(
+      context,
+    ); // OK após await pois foi capturado antes [web:43]
+    final appState = Provider.of<AppState>(context, listen: false);
+
     final success = await AuthService.login(_email.text.trim(), _senha.text);
 
-    if (!success) {
-      _showError('Email ou senha incorretos');
+    if (!mounted) return; // guarda o uso do State.context após await [web:43]
+
+    if (success) {
+      // Salva a senha em memória para reautenticação na criação de convites
+      appState.setSenhaUsuario(_senha.text);
+      // Não navegar manualmente: AuthWrapper decide a tela seguinte [web:106]
     } else {
-      debugPrint('LOGIN SUCESSO - Aguardando AuthWrapper');
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Email ou senha incorretos'),
+          backgroundColor: Colors.red,
+        ),
+      ); // UI de falha simples; inativos serão bloqueados no AuthWrapper [web:106]
     }
 
-    if (mounted) setState(() => _loading = false);
-  }
-
-  void _showError(String msg) {
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
-    }
+    setState(() => _loading = false);
   }
 
   @override

@@ -48,9 +48,6 @@ class PropertaskApp extends StatelessWidget {
   }
 }
 
-//
-// ✅ NOVO AUTHWRAPPER — 100% funcional e sem erros
-//
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
@@ -59,24 +56,30 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
-  StreamSubscription? _sub;
+  StreamSubscription<User?>? _sub;
+  bool _authReady = false; // aguarda o 1º evento do auth
 
   @override
   void initState() {
     super.initState();
-
     final appState = Provider.of<AppState>(context, listen: false);
 
-    // OUVIR APENAS UMA VEZ
-    _sub = FirebaseAuth.instance.authStateChanges().listen((user) async {
-      if (!mounted) return;
+    _sub = FirebaseAuth.instance.authStateChanges().listen(
+      (user) async {
+        if (!mounted) return;
 
-      appState.setUser(user);
-
-      if (user != null) {
-        await appState.carregarPerfil(user);
-      }
-    });
+        appState.setUser(user);
+        if (user != null) {
+          await appState.carregarPerfil(user);
+        }
+        if (mounted && !_authReady) {
+          setState(() => _authReady = true);
+        }
+      },
+      onError: (_) {
+        if (mounted && !_authReady) setState(() => _authReady = true);
+      },
+    );
   }
 
   @override
@@ -89,12 +92,57 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
 
+    // Evita cair na Login antes do Firebase reemitir a sessão persistida
+    if (!_authReady) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     if (appState.user == null) {
       return const LoginScreen();
     }
 
     if (appState.usuario == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    // BLOQUEIO DE CONTA INATIVA (sem signOut automático)
+    if (appState.usuario!.ativo != true) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Acesso bloqueado'),
+          backgroundColor: Colors.red,
+          foregroundColor: Colors.white,
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.block, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                const Text(
+                  'Sua conta está inativa.\nEntre em contato com o administrador.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Sair'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () async {
+                    await FirebaseAuth.instance.signOut();
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     return const DashboardScreen();

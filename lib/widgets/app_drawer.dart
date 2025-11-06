@@ -1,4 +1,3 @@
-// lib/widgets/app_drawer.dart
 import 'package:flutter/material.dart';
 import 'package:propertask/core/services/auth_service.dart';
 import 'package:provider/provider.dart';
@@ -15,6 +14,7 @@ import 'package:propertask/screen/equipe/equipe_screen.dart';
 
 class AppDrawer extends StatelessWidget {
   final String currentRoute;
+
   const AppDrawer({super.key, required this.currentRoute});
 
   @override
@@ -30,7 +30,7 @@ class AppDrawer extends StatelessWidget {
           );
         }
 
-        final cargo = usuario.cargo.toUpperCase();
+        final cargo = usuario.cargo?.toUpperCase() ?? '';
 
         return Drawer(
           child: Column(
@@ -56,7 +56,6 @@ class AppDrawer extends StatelessWidget {
                   ),
                 ),
               ),
-
               Expanded(
                 child: ListView(
                   padding: EdgeInsets.zero,
@@ -127,23 +126,19 @@ class AppDrawer extends StatelessWidget {
                         context,
                         Icons.group,
                         'Equipe',
-                        const EquipeScreen(),
+                        EquipeScreen(),
                         '/equipe',
                       ),
                   ],
                 ),
               ),
-
               const Divider(),
-
               ListTile(
                 leading: const Icon(Icons.logout, color: Colors.red),
                 title: const Text('Sair', style: TextStyle(color: Colors.red)),
                 onTap: () async {
-                  Navigator.pop(context); // fecha drawer
-                  Navigator.of(
-                    context,
-                  ).popUntil((route) => route.isFirst); // volta ao AuthWrapper
+                  Navigator.pop(context);
+                  Navigator.of(context).popUntil((route) => route.isFirst);
                   await AuthService.logout(context);
                 },
               ),
@@ -165,9 +160,7 @@ class AppDrawer extends StatelessWidget {
       leading: Icon(icon),
       title: Text(title),
       onTap: () {
-        Navigator.pop(context); // fecha drawer
-
-        // ✅ Não usar pushReplacement
+        Navigator.pop(context);
         if (ModalRoute.of(context)?.settings.name != route) {
           Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
         }

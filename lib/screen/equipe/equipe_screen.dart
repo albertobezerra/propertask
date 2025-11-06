@@ -1,3 +1,4 @@
+// lib/screen/equipe/equipe_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:propertask/screen/equipe/usuario_form_screen.dart';
@@ -25,13 +26,18 @@ class _EquipeScreenState extends State<EquipeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cargo = Provider.of<AppState>(context).usuario?.cargo ?? 'LIMPEZA';
+    final appState = Provider.of<AppState>(context);
+    final cargo = appState.usuario?.cargo ?? 'LIMPEZA';
     final podeEditar = Permissions.podeGerenciarUsuarios(cargo);
+    final emailAtual = appState.usuario?.email ?? '';
+    final senhaAtual = appState.senhaUsuario ?? '';
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Equipe'),
         centerTitle: true,
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
@@ -43,12 +49,18 @@ class _EquipeScreenState extends State<EquipeScreen> {
             IconButton(
               icon: const Icon(Icons.add),
               onPressed: () async {
-                final result = await Navigator.push(
+                final navigator = Navigator.of(
                   context,
-                  MaterialPageRoute(builder: (_) => const UsuarioFormScreen()),
+                ); // capture antes do await
+                final route = MaterialPageRoute<bool>(
+                  builder: (_) => UsuarioFormScreen(
+                    adminEmail: emailAtual,
+                    adminPassword: senhaAtual,
+                  ),
                 );
+                final result = await navigator.push(route);
                 if (!mounted) return;
-                if (result == true) setState(() {});
+                if (result == true) setState(() {}); // seguro após mounted
               },
             ),
         ],
@@ -89,7 +101,7 @@ class _EquipeScreenState extends State<EquipeScreen> {
                 }
 
                 var docs = snapshot.data!.docs.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
+                  final data = doc.data()! as Map<String, dynamic>;
                   final nome = (data['nome'] ?? '').toString().toLowerCase();
                   return nome.contains(_searchQuery);
                 }).toList();
@@ -98,7 +110,7 @@ class _EquipeScreenState extends State<EquipeScreen> {
                   itemCount: docs.length,
                   itemBuilder: (context, i) {
                     final doc = docs[i];
-                    final data = doc.data() as Map<String, dynamic>;
+                    final data = doc.data()! as Map<String, dynamic>;
                     final nome = data['nome'] ?? 'Sem nome';
                     final email = data['email'] ?? 'Sem email';
                     final cargo = data['cargo'] ?? 'LIMPEZA';
@@ -132,31 +144,39 @@ class _EquipeScreenState extends State<EquipeScreen> {
                           ],
                         ),
                         trailing: podeEditar
-                            ? PopupMenuButton(
-                                onSelected: (v) {
+                            ? PopupMenuButton<String>(
+                                onSelected: (v) async {
                                   if (v == 'edit') {
-                                    Navigator.push(
+                                    final navigator = Navigator.of(
                                       context,
+                                    ); // capture antes do await
+                                    final res = await navigator.push<bool>(
                                       MaterialPageRoute(
-                                        builder: (_) =>
-                                            UsuarioFormScreen(usuario: doc),
+                                        builder: (_) => UsuarioFormScreen(
+                                          usuario: doc,
+                                          adminEmail: emailAtual,
+                                          adminPassword: senhaAtual,
+                                        ),
                                       ),
-                                    ).then((_) {
-                                      if (!mounted) return;
-                                      setState(() {});
-                                    });
+                                    );
+                                    if (!mounted) return;
+                                    if (res == true) setState(() {});
                                   } else if (v == 'toggle') {
-                                    _toggleAtivo(context, doc);
+                                    // Captura o messenger e não usa Of(context) após await
+                                    final messenger = ScaffoldMessenger.of(
+                                      context,
+                                    );
+                                    await _toggleAtivo(doc, messenger);
                                   }
                                 },
-                                itemBuilder: (_) => [
-                                  const PopupMenuItem(
+                                itemBuilder: (_) => const [
+                                  PopupMenuItem(
                                     value: 'edit',
                                     child: Text('Editar'),
                                   ),
                                   PopupMenuItem(
                                     value: 'toggle',
-                                    child: Text(ativo ? 'Desativar' : 'Ativar'),
+                                    child: Text('Desativar/Ativar'),
                                   ),
                                 ],
                               )
@@ -182,6 +202,7 @@ class _EquipeScreenState extends State<EquipeScreen> {
       'LIMPEZA': 'Limpeza',
       'LAVANDERIA': 'Lavanderia',
       'MOTORISTA': 'Motorista',
+      'RH': 'RH',
     };
     return map[cargo] ?? cargo;
   }
@@ -196,20 +217,20 @@ class _EquipeScreenState extends State<EquipeScreen> {
     return map[cargo] ?? Colors.grey;
   }
 
-  void _toggleAtivo(BuildContext context, DocumentSnapshot doc) async {
-    final ctx = context; // ← SALVA ANTES DO AWAIT
-    final data = doc.data() as Map<String, dynamic>;
+  // NÃO usa BuildContext após await; recebe o messenger já resolvido
+  Future<void> _toggleAtivo(
+    DocumentSnapshot doc,
+    ScaffoldMessengerState messenger,
+  ) async {
+    final data = doc.data()! as Map<String, dynamic>;
     final novoAtivo = !(data['ativo'] == true);
-
     try {
       await doc.reference.update({'ativo': novoAtivo});
-      if (!ctx.mounted) return; // ← VERIFICA O MESMO CONTEXT
-      ScaffoldMessenger.of(ctx).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text(novoAtivo ? 'Ativado' : 'Desativado')),
       );
     } catch (e) {
-      if (!ctx.mounted) return;
-      ScaffoldMessenger.of(ctx).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
       );
     }

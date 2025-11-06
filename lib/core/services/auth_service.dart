@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:propertask/core/providers/app_state.dart';
 
 class AuthService {
-  // LOGIN
+  // LOGIN simples: só autentica; bloqueio de inativo fica no AuthWrapper.
   static Future<bool> login(String email, String password) async {
     try {
       await FirebaseAuth.instance.signInWithEmailAndPassword(
