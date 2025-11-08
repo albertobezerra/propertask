@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:propertask/core/providers/app_state.dart';
 import 'package:propertask/core/utils/permissions.dart';
 import 'package:intl/intl.dart';
+import 'package:propertask/widgets/app_drawer.dart';
 
 class PontoHistoricoScreen extends StatefulWidget {
   const PontoHistoricoScreen({super.key});
@@ -30,6 +31,10 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Histórico de Ponto'),
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
+        automaticallyImplyLeading: true,
+        leading: BackButton(onPressed: () => Navigator.of(context).pop()),
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_today),
@@ -45,6 +50,7 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
           ),
         ],
       ),
+      drawer: const AppDrawer(currentRoute: '/ponto/historico'),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('propertask')
@@ -70,11 +76,11 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
             itemBuilder: (context, i) {
               final doc = snapshot.data!.docs[i];
               final data = doc.data() as Map<String, dynamic>;
-              final tipo = data['tipo'] as String;
+              final tipo = (data['tipo'] ?? '') as String;
               final horarioReal = (data['horarioReal'] as Timestamp).toDate();
               final horarioArredondado =
                   (data['horarioArredondado'] as Timestamp).toDate();
-              final usuarioId = data['usuarioId'] as String;
+              final usuarioId = (data['usuarioId'] ?? '') as String;
 
               return FutureBuilder<DocumentSnapshot>(
                 future: FirebaseFirestore.instance
@@ -84,7 +90,8 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
                     .doc(usuarioId)
                     .get(),
                 builder: (context, userSnap) {
-                  final nome = userSnap.data?.get('nome') ?? 'Desconhecido';
+                  final nome = (userSnap.data?.get('nome') ?? 'Desconhecido')
+                      .toString();
                   return Card(
                     margin: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -110,9 +117,9 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
                           Text(
                             '${DateFormat('HH:mm').format(horarioReal)} → ${DateFormat('HH:mm').format(horarioArredondado)}',
                           ),
-                          if (data['observacao'] != null)
+                          if ((data['observacao'] ?? '').toString().isNotEmpty)
                             Text(
-                              data['observacao'],
+                              (data['observacao'] ?? '').toString(),
                               style: const TextStyle(
                                 fontStyle: FontStyle.italic,
                               ),
@@ -129,12 +136,12 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
                                   _excluirPonto(context, doc.id);
                                 }
                               },
-                              itemBuilder: (_) => [
-                                const PopupMenuItem(
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(
                                   value: 'edit',
                                   child: Text('Editar'),
                                 ),
-                                const PopupMenuItem(
+                                PopupMenuItem(
                                   value: 'delete',
                                   child: Text('Excluir'),
                                 ),
@@ -155,8 +162,9 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
   void _editarObservacao(BuildContext context, DocumentSnapshot doc) {
     final navigator = Navigator.of(context);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-    final controller = TextEditingController(text: doc['observacao'] ?? '');
+    final controller = TextEditingController(
+      text: (doc['observacao'] ?? '').toString(),
+    );
 
     showDialog(
       context: context,
@@ -175,9 +183,9 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
             onPressed: () async {
               try {
                 await doc.reference.update({
-                  'observacao': controller.text.isEmpty
+                  'observacao': controller.text.trim().isEmpty
                       ? null
-                      : controller.text,
+                      : controller.text.trim(),
                 });
                 if (!mounted) return;
                 navigator.pop();
