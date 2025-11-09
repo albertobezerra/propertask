@@ -1,4 +1,3 @@
-// lib/screen/lavanderia/lavanderia_screen.dart
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:propertask/core/utils/formatters.dart';
@@ -66,7 +65,7 @@ class LavanderiaScreen extends StatelessWidget {
                       leading: const Icon(Icons.home, color: Colors.blue),
                       title: Text(prop['nome'] ?? 'Sem nome'),
                       subtitle: Text(
-                        'T${prop['tipologia']} • ${roupas.length} itens',
+                        '${prop['tipologia'] ?? ''} • ${roupas.length} itens',
                       ),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: () => _mostrarRoupas(context, roupas),
@@ -82,6 +81,27 @@ class LavanderiaScreen extends StatelessWidget {
   }
 
   List<String> _calcularRoupas(Map<String, dynamic> prop) {
+    final roupas = <String>[];
+
+    // 1) Preferir mapa salvo na propriedade
+    final roupaMapDyn = prop['roupa'];
+    if (roupaMapDyn is Map) {
+      final roupaMap = Map<String, dynamic>.from(roupaMapDyn);
+      roupaMap.forEach((k, v) {
+        final key = k.toString();
+        final qtd = (v is int)
+            ? v
+            : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
+        if (qtd > 0) {
+          for (var i = 0; i < qtd; i++) {
+            roupas.add(key);
+          }
+        }
+      });
+      if (roupas.isNotEmpty) return roupas;
+    }
+
+    // 2) Fallback por tipologia (legado)
     final tipo = prop['tipologia']?.toString() ?? 'T1';
     final config = {
       'T0': {
@@ -91,6 +111,7 @@ class LavanderiaScreen extends StatelessWidget {
         'toalha_banho': 1,
         'toalha_rosto': 1,
         'tapete': 1,
+        'pano_limpeza': 1,
       },
       'T1': {
         'lençol_casal': 1,
@@ -99,6 +120,7 @@ class LavanderiaScreen extends StatelessWidget {
         'toalha_banho': 2,
         'toalha_rosto': 2,
         'tapete': 1,
+        'pano_limpeza': 1,
       },
       'T2': {
         'lençol_casal': 2,
@@ -107,17 +129,17 @@ class LavanderiaScreen extends StatelessWidget {
         'toalha_banho': 4,
         'toalha_rosto': 4,
         'tapete': 2,
+        'pano_limpeza': 1,
       },
     };
 
-    final itens = <String>[];
     final mapa = config[tipo] ?? config['T1']!;
     mapa.forEach((item, qtd) {
       for (int i = 0; i < qtd; i++) {
-        itens.add(item);
+        roupas.add(item);
       }
     });
-    return itens;
+    return roupas;
   }
 
   void _mostrarRoupas(BuildContext context, List<String> roupas) {
@@ -137,9 +159,12 @@ class LavanderiaScreen extends StatelessWidget {
             children: contagem.entries.map((e) {
               final nome = e.key
                   .replaceAll('_', ' ')
+                  .replaceAll('lencol', 'lençol')
                   .replaceAll('casal', 'de casal')
+                  .replaceAll('solteiro', 'de solteiro')
                   .replaceAll('banho', 'de banho')
-                  .replaceAll('rosto', 'de rosto');
+                  .replaceAll('rosto', 'de rosto')
+                  .replaceAll('pano limpeza', 'pano de limpeza');
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 2),
                 child: Text('• ${e.value}x $nome'),
