@@ -8,7 +8,7 @@ import 'package:propertask/core/utils/permissions.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:propertask/widgets/app_drawer.dart'; // IMPORT DO DRAWER
+import 'package:propertask/widgets/app_drawer.dart';
 
 class RelatoriosScreen extends StatefulWidget {
   const RelatoriosScreen({super.key});
@@ -20,13 +20,16 @@ class RelatoriosScreen extends StatefulWidget {
 class _RelatoriosScreenState extends State<RelatoriosScreen> {
   DateTimeRange? _dateRange;
   List<Map<String, dynamic>> _tarefasConcluidas = [];
+  bool _loading = false;
 
   @override
   void initState() {
     super.initState();
+    // Últimos 7 dias por padrão
+    final now = DateTime.now();
     _dateRange = DateTimeRange(
-      start: DateTime.now().subtract(const Duration(days: 7)),
-      end: DateTime.now(),
+      start: now.subtract(const Duration(days: 7)),
+      end: now,
     );
     _loadRelatorio();
   }
@@ -34,47 +37,143 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
   Future<void> _loadRelatorio() async {
     if (_dateRange == null) return;
 
-    final inicio = Timestamp.fromDate(_dateRange!.start);
-    final fim = Timestamp.fromDate(
-      _dateRange!.end.add(const Duration(days: 1)),
+    setState(() => _loading = true);
+
+    // Normaliza: início do dia inicial e início do dia seguinte ao final
+    final inicioDia = DateTime(
+      _dateRange!.start.year,
+      _dateRange!.start.month,
+      _dateRange!.start.day,
     );
+    final fimDiaExclusivo = DateTime(
+      _dateRange!.end.year,
+      _dateRange!.end.month,
+      _dateRange!.end.day,
+    ).add(const Duration(days: 1));
 
-    final snapshot = await FirebaseFirestore.instance
-        .collection('propertask')
-        .doc('tarefas')
-        .collection('tarefas')
-        .where('status', isEqualTo: 'concluida')
-        .where('concluidaEm', isGreaterThanOrEqualTo: inicio)
-        .where('concluidaEm', isLessThan: fim)
-        .get();
+    final inicio = Timestamp.fromDate(inicioDia);
+    final fim = Timestamp.fromDate(fimDiaExclusivo);
 
-    final tarefas = <Map<String, dynamic>>[];
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
-      final propDoc = await FirebaseFirestore.instance
+    try {
+      final tarefasRef = FirebaseFirestore.instance
           .collection('propertask')
-          .doc('propriedades')
-          .collection('propriedades')
-          .doc(data['propriedadeId'])
-          .get();
-      final userDoc = await FirebaseFirestore.instance
-          .collection('propertask')
-          .doc('usuarios')
-          .collection('usuarios')
-          .doc(data['responsavelId'])
-          .get();
+          .doc('tarefas')
+          .collection('tarefas');
 
-      tarefas.add({
-        'titulo': data['titulo'],
-        'tipo': data['tipo'],
-        'propriedade': propDoc['nome'] ?? 'Desconhecida',
-        'funcionario': userDoc['nome'] ?? 'Desconhecido',
-        'data': (data['concluidaEm'] as Timestamp).toDate(),
+      // status == 'concluida' + range em concluidaEm exige índice composto; incluir orderBy ajuda o planejador
+      final query = tarefasRef
+          .where('status', isEqualTo: 'concluida')
+          .where('concluidaEm', isGreaterThanOrEqualTo: inicio)
+          .where('concluidaEm', isLessThan: fim)
+          .orderBy('concluidaEm');
+
+      final snapshot = await query.get();
+
+      if (snapshot.docs.isEmpty) {
+        if (!mounted) return;
+        setState(() {
+          _tarefasConcluidas = [];
+          _loading = false;
+        });
+        return;
+      }
+
+      // Coleta ids únicos
+      final propIds = snapshot.docs
+          .map((d) => (d.data()['propriedadeId'] as String?))
+          .whereType<String>()
+          .toSet();
+      final userIds = snapshot.docs
+          .map((d) => (d.data()['responsavelId'] as String?))
+          .whereType<String>()
+          .toSet();
+
+      // Busca paralela
+      final propFutures = {
+        for (final id in propIds)
+          id: FirebaseFirestore.instance
+              .collection('propertask')
+              .doc('propriedades')
+              .collection('propriedades')
+              .doc(id)
+              .get(),
+      };
+      final userFutures = {
+        for (final id in userIds)
+          id: FirebaseFirestore.instance
+              .collection('propertask')
+              .doc('usuarios')
+              .collection('usuarios')
+              .doc(id)
+              .get(),
+      };
+
+      final propDocs = await Future.wait(propFutures.values);
+      final userDocs = await Future.wait(userFutures.values);
+
+      final propMap = <String, Map<String, dynamic>>{
+        for (final doc in propDocs) doc.id: doc.data() ?? const {},
+      };
+      final userMap = <String, Map<String, dynamic>>{
+        for (final doc in userDocs) doc.id: doc.data() ?? const {},
+      };
+
+      final tarefas = <Map<String, dynamic>>[];
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final pid = data['propriedadeId'] as String?;
+        final uid = data['responsavelId'] as String?;
+        final prop = pid != null ? (propMap[pid] ?? const {}) : const {};
+        final user = uid != null ? (userMap[uid] ?? const {}) : const {};
+
+        final titulo = (data['titulo'] ?? '').toString();
+        final tipo = (data['tipo'] ?? '').toString();
+        final concluidaEm = (data['concluidaEm'] is Timestamp)
+            ? (data['concluidaEm'] as Timestamp).toDate()
+            : (data['concluidaEm'] is DateTime
+                  ? data['concluidaEm'] as DateTime
+                  : null);
+
+        tarefas.add({
+          'titulo': titulo,
+          'tipo': tipo,
+          'propriedade':
+              (prop['nome'] ?? data['propriedadeNome'] ?? 'Desconhecida')
+                  .toString(),
+          'funcionario': (user['nome'] ?? 'Desconhecido').toString(),
+          'data': concluidaEm ?? DateTime.fromMillisecondsSinceEpoch(0),
+        });
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _tarefasConcluidas = tarefas;
+        _loading = false;
       });
+    } on FirebaseException catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      // Índice ausente: instruir criação do índice composto
+      if (e.code == 'failed-precondition') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Crie o índice: status ASC + concluidaEm ASC em propertask/tarefas/tarefas',
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao carregar: ${e.message ?? e.code}')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Erro inesperado: $e')));
     }
-
-    if (!mounted) return;
-    setState(() => _tarefasConcluidas = tarefas);
   }
 
   @override
@@ -86,7 +185,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Relatórios'),
-          backgroundColor: Colors.blue.shade700, // PADRÃO VISUAL
+          backgroundColor: Colors.blue.shade700,
           foregroundColor: Colors.white,
           leading: Builder(
             builder: (context) => IconButton(
@@ -94,9 +193,9 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
               onPressed: () => Scaffold.of(context).openDrawer(),
               tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
             ),
-          ), // LEADING QUE ABRE O DRAWER
+          ),
         ),
-        drawer: const AppDrawer(currentRoute: '/relatorios'), // DRAWER PADRÃO
+        drawer: const AppDrawer(currentRoute: '/relatorios'),
         body: const Center(
           child: Text('Acesso restrito a supervisores e superiores.'),
         ),
@@ -105,13 +204,14 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
 
     final porTipo = <String, int>{};
     for (final t in _tarefasConcluidas) {
-      porTipo[t['tipo']] = (porTipo[t['tipo']] ?? 0) + 1;
+      final tipo = (t['tipo'] ?? '').toString();
+      porTipo[tipo] = (porTipo[tipo] ?? 0) + 1;
     }
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Relatórios'),
-        backgroundColor: Colors.blue.shade700, // PADRÃO VISUAL
+        backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
         leading: Builder(
           builder: (context) => IconButton(
@@ -119,7 +219,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
             onPressed: () => Scaffold.of(context).openDrawer(),
             tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
           ),
-        ), // LEADING QUE ABRE O DRAWER
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.date_range),
@@ -140,7 +240,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
           IconButton(icon: const Icon(Icons.share), onPressed: _exportCSV),
         ],
       ),
-      drawer: const AppDrawer(currentRoute: '/relatorios'), // DRAWER PADRÃO
+      drawer: const AppDrawer(currentRoute: '/relatorios'),
       body: Column(
         children: [
           Card(
@@ -157,16 +257,23 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    '${_tarefasConcluidas.length} tarefas concluídas',
-                    style: const TextStyle(fontSize: 18),
-                  ),
+                  if (_loading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: CircularProgressIndicator(),
+                    )
+                  else
+                    Text(
+                      '${_tarefasConcluidas.length} tarefas concluídas',
+                      style: const TextStyle(fontSize: 18),
+                    ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 12,
                     children: porTipo.entries.map((e) {
+                      final tipo = e.key.isEmpty ? '—' : e.key.toUpperCase();
                       return Chip(
-                        label: Text('${e.key.toUpperCase()}: ${e.value}'),
+                        label: Text('$tipo: ${e.value}'),
                         backgroundColor: _getTipoColor(e.key),
                       );
                     }).toList(),
@@ -176,7 +283,9 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
             ),
           ),
           Expanded(
-            child: _tarefasConcluidas.isEmpty
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _tarefasConcluidas.isEmpty
                 ? const Center(
                     child: Text('Nenhuma tarefa concluída no período.'),
                   )
@@ -184,6 +293,14 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
                     itemCount: _tarefasConcluidas.length,
                     itemBuilder: (context, i) {
                       final t = _tarefasConcluidas[i];
+                      final tipo = (t['tipo'] ?? '').toString();
+                      final titulo = (t['titulo'] ?? '').toString();
+                      final propriedade = (t['propriedade'] ?? '').toString();
+                      final funcionario = (t['funcionario'] ?? '').toString();
+                      final data = (t['data'] is DateTime)
+                          ? t['data'] as DateTime
+                          : DateTime.fromMillisecondsSinceEpoch(0);
+
                       return Card(
                         margin: const EdgeInsets.symmetric(
                           horizontal: 12,
@@ -191,21 +308,19 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
                         ),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: _getTipoColor(t['tipo']),
+                            backgroundColor: _getTipoColor(tipo),
                             child: Text(
-                              t['tipo'][0].toUpperCase(),
+                              tipo.isNotEmpty ? tipo[0].toUpperCase() : '?',
                               style: const TextStyle(color: Colors.white),
                             ),
                           ),
                           title: Text(
-                            t['titulo'],
+                            titulo,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          subtitle: Text(
-                            '${t['propriedade']} • ${t['funcionario']}',
-                          ),
+                          subtitle: Text('$propriedade • $funcionario'),
                           trailing: Text(
-                            DateFormat('dd/MM HH:mm').format(t['data']),
+                            DateFormat('dd/MM HH:mm').format(data),
                           ),
                         ),
                       );
@@ -218,7 +333,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
   }
 
   Color _getTipoColor(String tipo) {
-    switch (tipo) {
+    switch (tipo.toLowerCase()) {
       case 'limpeza':
         return Colors.blue;
       case 'entrega':
@@ -232,6 +347,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
 
   Future<void> _exportCSV() async {
     if (_tarefasConcluidas.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Nenhum dado para exportar')),
       );
@@ -246,12 +362,15 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
       'Data/Hora',
     ];
     final rows = _tarefasConcluidas.map((t) {
+      final dt = (t['data'] is DateTime)
+          ? t['data'] as DateTime
+          : DateTime.fromMillisecondsSinceEpoch(0);
       return [
-        t['titulo'],
-        t['tipo'].toUpperCase(),
-        t['propriedade'],
-        t['funcionario'],
-        DateFormat('dd/MM/yyyy HH:mm').format(t['data']),
+        (t['titulo'] ?? '').toString(),
+        (t['tipo'] ?? '').toString().toUpperCase(),
+        (t['propriedade'] ?? '').toString(),
+        (t['funcionario'] ?? '').toString(),
+        DateFormat('dd/MM/yyyy HH:mm').format(dt),
       ].join(',');
     }).toList();
 
