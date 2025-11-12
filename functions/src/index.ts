@@ -3,7 +3,7 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 admin.initializeApp();
 
-export const onTaskWrite = functions.firestore
+export const onTaskWrite = functions.region('europe-west1').firestore
     .document('propertask/tarefas/tarefas/{id}')
     .onWrite(async (change, ctx) => {
         const after = change.after.exists ? change.after.data() as any : null;
