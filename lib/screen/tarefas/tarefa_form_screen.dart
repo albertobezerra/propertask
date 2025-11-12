@@ -1,12 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:propertask/main.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class TarefaFormScreen extends StatefulWidget {
   final DocumentSnapshot? tarefa;
-
   const TarefaFormScreen({super.key, this.tarefa});
 
   @override
@@ -22,9 +19,8 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
   String? _propriedadeId, _responsavelId;
   DateTime _data = DateTime.now();
 
-  // Sofá-cama
-  bool _propTemSofaCama = false; // vindo da propriedade
-  bool _fazerSofaCama = true; // controle do formulário quando aplicável
+  bool _propTemSofaCama = false;
+  bool _fazerSofaCama = true;
 
   @override
   void initState() {
@@ -42,7 +38,6 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
         : DateTime.now();
     _fazerSofaCama = (data['fazerSofaCama'] ?? true) == true;
 
-    // Se já veio com propriedade, buscar info de sofá-cama
     if (_propriedadeId != null) {
       _loadPropriedadeSofaCama(_propriedadeId!);
     }
@@ -60,13 +55,10 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
       final tem = (d['sofaCama'] ?? false) == true;
       setState(() {
         _propTemSofaCama = tem;
-        // Quando a prop permite, manter marcado por padrão
         if (tem && widget.tarefa == null) _fazerSofaCama = true;
       });
     } catch (_) {
-      setState(() {
-        _propTemSofaCama = false;
-      });
+      setState(() => _propTemSofaCama = false);
     }
   }
 
@@ -78,7 +70,6 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Locale do app (para datas e calendário)
     final locale = Localizations.localeOf(context).toString();
     final dataFmt = DateFormat('dd/MM/yyyy', locale);
 
@@ -91,7 +82,6 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // Tipo
             DropdownButtonFormField<String>(
               initialValue: _tipo,
               items: const [
@@ -108,7 +98,6 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Propriedade
             FutureBuilder<QuerySnapshot>(
               future: FirebaseFirestore.instance
                   .collection('propertask')
@@ -138,7 +127,6 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Sofá‑cama (aparece só se a propriedade tiver possibilidade)
             if (_propTemSofaCama) ...[
               CheckboxListTile(
                 value: _fazerSofaCama,
@@ -149,7 +137,6 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
               const SizedBox(height: 8),
             ],
 
-            // Responsável
             FutureBuilder<QuerySnapshot>(
               future: FirebaseFirestore.instance
                   .collection('propertask')
@@ -176,7 +163,6 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Data (dd/MM/yyyy com zero à esquerda e calendário no idioma do telefone)
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('data'),
@@ -186,16 +172,14 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
                 final picked = await showDatePicker(
                   context: context,
                   initialDate: _data,
-                  firstDate: DateTime.now().subtract(const Duration(days: 0)),
+                  firstDate: DateTime.now(),
                   lastDate: DateTime.now().add(const Duration(days: 365)),
-                  // Usa o locale do app (por padrão herdado do contexto)
                 );
                 if (picked != null) setState(() => _data = picked);
               },
             ),
             const SizedBox(height: 16),
 
-            // Observações (inicial minúscula como solicitado)
             TextFormField(
               controller: _observacoes,
               decoration: const InputDecoration(labelText: 'observações'),
@@ -204,75 +188,8 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Botão salvar
             ElevatedButton(
-              onPressed: () async {
-                if (!_formKey.currentState!.validate()) return;
-                if (_propriedadeId == null || _responsavelId == null) return;
-
-                final navigator = Navigator.of(context);
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-                // Buscar nome da propriedade
-                final propDoc = await FirebaseFirestore.instance
-                    .collection('propertask')
-                    .doc('propriedades')
-                    .collection('propriedades')
-                    .doc(_propriedadeId!)
-                    .get();
-                final propNome = (propDoc['nome'] ?? 'Propriedade').toString();
-
-                // Gerar um título automaticamente (campo não exibido)
-                final tipoNome =
-                    {
-                      'limpeza': 'Limpeza',
-                      'entrega': 'Entrega',
-                      'recolha': 'Recolha',
-                      'manutencao': 'Manutenção',
-                    }[_tipo] ??
-                    _tipo;
-                final tituloAuto = '$tipoNome • ${dataFmt.format(_data)}';
-
-                final ref = FirebaseFirestore.instance
-                    .collection('propertask')
-                    .doc('tarefas')
-                    .collection('tarefas');
-
-                final tarefaData = {
-                  'titulo': tituloAuto, // gerado automaticamente
-                  'tipo': _tipo,
-                  'propriedadeId': _propriedadeId,
-                  'propriedadeNome': propNome,
-                  'responsavelId': _responsavelId,
-                  'status': _status,
-                  'data': Timestamp.fromDate(_data),
-                  'observacoes': _observacoes.text.trim().isEmpty
-                      ? null
-                      : _observacoes.text.trim(),
-                  // grava sofá-cama apenas se a propriedade permitir
-                  'fazerSofaCama': _propTemSofaCama ? _fazerSofaCama : null,
-                };
-
-                try {
-                  if (widget.tarefa == null) {
-                    await ref.add(tarefaData);
-                    _showLocalNotification(tituloAuto, propNome);
-                  } else {
-                    await widget.tarefa!.reference.update(tarefaData);
-                  }
-                  if (!mounted) return;
-                  navigator.pop();
-                } catch (e) {
-                  if (mounted) {
-                    scaffoldMessenger.showSnackBar(
-                      SnackBar(
-                        content: Text('Erro ao salvar tarefa: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              },
+              onPressed: _onSalvarPressed,
               child: Text(widget.tarefa == null ? 'Criar tarefa' : 'Salvar'),
             ),
           ],
@@ -281,20 +198,75 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
     );
   }
 
-  void _showLocalNotification(String titulo, String propriedade) async {
-    const android = AndroidNotificationDetails(
-      'tarefas_channel',
-      'Tarefas',
-      channelDescription: 'Notificações de novas tarefas',
-      importance: Importance.high,
-      priority: Priority.high,
-    );
-    const platform = NotificationDetails(android: android);
-    await notifications.show(
-      0,
-      'Nova tarefa atribuída',
-      'Você foi atribuído a: $titulo em $propriedade',
-      platform,
-    );
+  Future<void> _onSalvarPressed() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_propriedadeId == null || _responsavelId == null) return;
+
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    try {
+      // Buscar nome da propriedade
+      final propDoc = await FirebaseFirestore.instance
+          .collection('propertask')
+          .doc('propriedades')
+          .collection('propriedades')
+          .doc(_propriedadeId!)
+          .get();
+      final propNome = (propDoc['nome'] ?? 'Propriedade').toString();
+
+      final dataFmt = DateFormat('dd/MM/yyyy');
+      final tipoNome =
+          {
+            'limpeza': 'Limpeza',
+            'entrega': 'Entrega',
+            'recolha': 'Recolha',
+            'manutencao': 'Manutenção',
+          }[_tipo] ??
+          _tipo;
+      final tituloAuto = '$tipoNome • ${dataFmt.format(_data)}';
+
+      final ref = FirebaseFirestore.instance
+          .collection('propertask')
+          .doc('tarefas')
+          .collection('tarefas');
+
+      final base = {
+        'titulo': tituloAuto,
+        'tipo': _tipo,
+        'propriedadeId': _propriedadeId,
+        'propriedadeNome': propNome,
+        'responsavelId': _responsavelId,
+        'status': _status,
+        'data': Timestamp.fromDate(_data),
+        'observacoes': _observacoes.text.trim().isEmpty
+            ? null
+            : _observacoes.text.trim(),
+        'fazerSofaCama': _propTemSofaCama ? _fazerSofaCama : null,
+      };
+
+      if (widget.tarefa == null) {
+        await ref.add({...base, 'createdAt': FieldValue.serverTimestamp()});
+        // Não chama notificação local: Cloud Function enviará o push
+      } else {
+        await widget.tarefa!.reference.update({
+          ...base,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        // Se mudar o responsavelId, a Function também dispara push
+      }
+
+      if (!mounted) return;
+      navigator.pop();
+    } catch (e) {
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Erro ao salvar tarefa: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
