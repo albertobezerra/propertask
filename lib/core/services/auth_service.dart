@@ -19,6 +19,10 @@ class AuthService {
     }
   }
 
+  static Future<void> esqueciSenha(String email) async {
+    await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+  }
+
   // LOGOUT
   static Future<void> logout(BuildContext context) async {
     final appState = Provider.of<AppState>(context, listen: false);
