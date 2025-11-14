@@ -6,6 +6,8 @@ import 'dashboard_coord_screen.dart';
 import 'dashboard_sup_screen.dart';
 import 'dashboard_ceo_screen.dart';
 import 'dashboard_dev_screen.dart';
+import 'dashboard_rh_screen.dart';
+import 'dashboard_lavanderia_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -17,12 +19,13 @@ class DashboardScreen extends StatelessWidget {
     if (usuario == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    final cargo = usuario.cargo?.toUpperCase() ?? '';
+    final cargo = usuario.cargo.toUpperCase();
 
     switch (cargo) {
       case 'LIMPEZA':
-      case 'LAVANDERIA':
         return const DashboardEmpregadoScreen();
+      case 'LAVANDERIA':
+        return const DashboardLavanderiaScreen();
       case 'COORDENADOR':
         return const DashboardCoordScreen();
       case 'SUPERVISOR':
@@ -31,6 +34,8 @@ class DashboardScreen extends StatelessWidget {
         return const DashboardCeoScreen();
       case 'DEV':
         return const DashboardDevScreen();
+      case 'RH':
+        return const DashboardRhScreen();
       default:
         return const DashboardEmpregadoScreen(); // fallback
     }

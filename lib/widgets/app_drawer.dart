@@ -11,11 +11,29 @@ import 'package:propertask/screen/relatorios/relatorios_screen.dart';
 import 'package:propertask/screen/ponto/ponto_screen.dart';
 import 'package:propertask/screen/lavanderia/lavanderia_screen.dart';
 import 'package:propertask/screen/equipe/equipe_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:propertask/core/services/storage_service.dart';
 
 class AppDrawer extends StatelessWidget {
   final String currentRoute;
 
   const AppDrawer({super.key, required this.currentRoute});
+
+  Future<void> _updateAvatar(BuildContext context, AppState appState) async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      final urls = await StorageService().uploadImages([image]);
+      if (!context.mounted) return;
+      if (urls.isNotEmpty) {
+        await appState.atualizarFotoUsuario(urls.first);
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Foto atualizada com sucesso!')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,32 +48,83 @@ class AppDrawer extends StatelessWidget {
           );
         }
 
-        final cargo = usuario.cargo?.toUpperCase() ?? '';
+        final avatarUrl = usuario.fotoUrl;
+        final name = usuario.nome;
+        final cargo = usuario.cargo.toUpperCase();
 
         return Drawer(
           child: Column(
             children: [
-              UserAccountsDrawerHeader(
-                accountName: const Text(
-                  'Propertask',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                accountEmail: Text(user.email ?? 'Usuário'),
-                currentAccountPicture: CircleAvatar(
-                  backgroundColor: Colors.white,
-                  child: Text(
-                    user.email?.isNotEmpty == true
-                        ? user.email![0].toUpperCase()
-                        : 'U',
-                    style: const TextStyle(fontSize: 40, color: Colors.blue),
-                  ),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  vertical: 36,
+                  horizontal: 16,
                 ),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.blue.shade700, Colors.blue.shade500],
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(38),
+                    bottomRight: Radius.circular(38),
                   ),
                 ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _updateAvatar(context, appState),
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          CircleAvatar(
+                            radius: 36,
+                            backgroundColor: Colors.white,
+                            backgroundImage:
+                                (avatarUrl != null && avatarUrl.isNotEmpty)
+                                ? NetworkImage(avatarUrl)
+                                : null,
+                            child: avatarUrl == null || avatarUrl.isEmpty
+                                ? Icon(
+                                    Icons.person,
+                                    size: 40,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  )
+                                : null,
+                          ),
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                            child: Icon(
+                              Icons.camera_alt,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    Text(
+                      cargo,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
               ),
+              const SizedBox(height: 14),
               Expanded(
                 child: ListView(
                   padding: EdgeInsets.zero,
@@ -126,7 +195,7 @@ class AppDrawer extends StatelessWidget {
                         context,
                         Icons.group,
                         'Equipe',
-                        EquipeScreen(),
+                        const EquipeScreen(),
                         '/equipe',
                       ),
                   ],
@@ -142,6 +211,7 @@ class AppDrawer extends StatelessWidget {
                   await AuthService.logout(context);
                 },
               ),
+              const SizedBox(height: 14),
             ],
           ),
         );

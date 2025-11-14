@@ -1,24 +1,7 @@
-// lib/core/providers/app_state.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
-class Usuario {
-  final String? email;
-  final String? cargo;
-  final bool ativo;
-
-  Usuario({this.email, this.cargo, required this.ativo});
-
-  factory Usuario.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return Usuario(
-      email: data['email'] as String?,
-      cargo: data['cargo'] as String?,
-      ativo: (data['ativo'] == true), // default false se null
-    );
-  }
-}
+import 'package:propertask/core/models/usuario.dart'; // Importa o modelo completo!
 
 class AppState with ChangeNotifier {
   User? _user;
@@ -55,6 +38,28 @@ class AppState with ChangeNotifier {
       _usuario = null;
     }
     notifyListeners();
+  }
+
+  Future<void> atualizarFotoUsuario(String fotoUrl) async {
+    if (_usuario == null || _user == null) return;
+    // Cria um novo Usuario atualizado
+    _usuario = Usuario(
+      id: _usuario!.id,
+      nome: _usuario!.nome,
+      email: _usuario!.email,
+      cargo: _usuario!.cargo,
+      telefone: _usuario!.telefone,
+      fotoUrl: fotoUrl,
+      criadoEm: _usuario!.criadoEm,
+      ativo: _usuario!.ativo,
+    );
+    notifyListeners();
+    await FirebaseFirestore.instance
+        .collection('propertask')
+        .doc('usuarios')
+        .collection('usuarios')
+        .doc(_user!.uid)
+        .update({'fotoUrl': fotoUrl});
   }
 
   void limpar() {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:propertask/widgets/app_drawer.dart';
 
 class DashboardRhScreen extends StatelessWidget {
   const DashboardRhScreen({super.key});
@@ -29,6 +30,7 @@ class DashboardRhScreen extends StatelessWidget {
         foregroundColor: cs.primary,
         elevation: 0,
       ),
+      drawer: AppDrawer(currentRoute: '/dashboard'),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

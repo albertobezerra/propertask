@@ -33,7 +33,7 @@ class DashboardEmpregadoScreen extends StatelessWidget {
       );
     }
 
-    final cargo = usuario.cargo?.toUpperCase() ?? '';
+    final cargo = usuario.cargo.toUpperCase();
     final hoje = DateTime.now();
 
     return Scaffold(

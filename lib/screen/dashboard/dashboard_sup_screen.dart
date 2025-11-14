@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:propertask/widgets/app_drawer.dart';
 
 class DashboardSupScreen extends StatelessWidget {
   const DashboardSupScreen({super.key});
@@ -20,6 +21,7 @@ class DashboardSupScreen extends StatelessWidget {
         foregroundColor: cs.primary,
         elevation: 0,
       ),
+      drawer: AppDrawer(currentRoute: '/dashboard'),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
