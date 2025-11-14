@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:propertask/conf/app_theme.dart';
 
 import 'package:propertask/core/providers/app_state.dart';
 import 'package:propertask/screen/dashboard/dashboard_screen.dart';
@@ -132,11 +133,10 @@ class PropertaskApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey, // necessário para deep link da notificação
+      navigatorKey: navigatorKey,
       title: 'Propertask',
-      theme: ThemeData.light(),
+      theme: appTheme, // <<< Use seu ThemeData custom aqui!
       darkTheme: ThemeData.dark(),
-      // Localização oficial
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
