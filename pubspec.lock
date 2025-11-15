@@ -73,14 +73,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.1.0"
-  cloudinary_public:
-    dependency: "direct main"
-    description:
-      name: cloudinary_public
-      sha256: "30c2aac5a31b468e5e955d2bbbac3eebcd1c66c9c7c2ffd75828606503bdda68"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.23.1"
   collection:
     dependency: transitive
     description:
@@ -129,22 +121,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.11"
-  dio:
-    dependency: transitive
-    description:
-      name: dio
-      sha256: d90ee57923d1828ac14e492ca49440f65477f4bb1263575900be731a3dac66a9
-      url: "https://pub.dev"
-    source: hosted
-    version: "5.9.0"
-  dio_web_adapter:
-    dependency: transitive
-    description:
-      name: dio_web_adapter
-      sha256: "7586e476d70caecaf1686d21eee7247ea43ef5c345eab9e0cc3583ff13378d78"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.1.1"
   fake_async:
     dependency: transitive
     description:
@@ -289,6 +265,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.1.0"
+  firebase_storage:
+    dependency: "direct main"
+    description:
+      name: firebase_storage
+      sha256: "3438f38590186010ce76ece683ebf3b842cd637f31f83a13620917d7438a58fd"
+      url: "https://pub.dev"
+    source: hosted
+    version: "13.0.4"
+  firebase_storage_platform_interface:
+    dependency: transitive
+    description:
+      name: firebase_storage_platform_interface
+      sha256: "5d56021a9d30f7ca89559c96cc4c7250ce6ff8881382ff7238fde64a1f449e39"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.2.15"
+  firebase_storage_web:
+    dependency: transitive
+    description:
+      name: firebase_storage_web
+      sha256: a06775d1df6dd90f5fa3fe9e221b988dcbc221e73a0f8951136536e6d5e548e6
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.11.0"
   fixnum:
     dependency: transitive
     description:

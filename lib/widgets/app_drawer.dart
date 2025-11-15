@@ -23,14 +23,30 @@ class AppDrawer extends StatelessWidget {
     final picker = ImagePicker();
     final image = await picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
-      final urls = await StorageService().uploadImages([image]);
-      if (!context.mounted) return;
-      if (urls.isNotEmpty) {
-        await appState.atualizarFotoUsuario(urls.first);
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Foto atualizada com sucesso!')),
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
+      try {
+        final url = await StorageService().uploadUserProfileImage(
+          image,
+          appState.usuario!.id,
         );
+        if (context.mounted) Navigator.of(context).pop(); // fecha o loading
+        await appState.atualizarFotoUsuario(url);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Foto atualizada com sucesso!')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) Navigator.of(context).pop();
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Erro ao subir imagem: $e')));
+        }
       }
     }
   }
@@ -53,182 +69,180 @@ class AppDrawer extends StatelessWidget {
         final cargo = usuario.cargo.toUpperCase();
 
         return Drawer(
-          child: Column(
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  vertical: 36,
-                  horizontal: 16,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(38),
-                    bottomRight: Radius.circular(38),
-                  ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    GestureDetector(
+          child: Container(
+            color: const Color(
+              0xFF6AB090,
+            ), // ajustável para seu verde principal
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const SizedBox(height: 32),
+                  Center(
+                    child: GestureDetector(
                       onTap: () => _updateAvatar(context, appState),
-                      child: Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          CircleAvatar(
-                            radius: 36,
-                            backgroundColor: Colors.white,
-                            backgroundImage:
-                                (avatarUrl != null && avatarUrl.isNotEmpty)
-                                ? NetworkImage(avatarUrl)
-                                : null,
-                            child: avatarUrl == null || avatarUrl.isEmpty
-                                ? Icon(
-                                    Icons.person,
-                                    size: 40,
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary,
-                                  )
-                                : null,
+                      child: CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Colors.blueAccent,
+                        backgroundImage:
+                            (avatarUrl != null && avatarUrl.isNotEmpty)
+                            ? NetworkImage(avatarUrl)
+                            : null,
+                        child: avatarUrl == null || avatarUrl.isEmpty
+                            ? Icon(
+                                Icons.person,
+                                size: 40,
+                                color: const Color(0xFF6AB090),
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  const SizedBox(height: 2),
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    cargo,
+                    style: TextStyle(
+                      color: Colors.white..withValues(alpha: 0.67),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  // --- MENU INTELIGENTE POR PERMISSÃO ---
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 18,
+                      ),
+                      children: [
+                        if (currentRoute != '/dashboard')
+                          _drawerItem(
+                            context,
+                            Icons.dashboard,
+                            'Dashboard',
+                            const DashboardScreen(),
+                            '/dashboard',
                           ),
-                          CircleAvatar(
-                            radius: 14,
-                            backgroundColor: Theme.of(
-                              context,
-                            ).colorScheme.primary,
-                            child: Icon(
-                              Icons.camera_alt,
-                              size: 16,
-                              color: Colors.white,
-                            ),
+                        if (Permissions.podeVerTarefas(cargo) &&
+                            currentRoute != '/tarefas')
+                          _drawerItem(
+                            context,
+                            Icons.task,
+                            'Tarefas',
+                            const TarefasScreen(),
+                            '/tarefas',
                           ),
-                        ],
-                      ),
+                        if (currentRoute != '/perfil')
+                          _drawerItem(
+                            context,
+                            Icons.person,
+                            'Perfil',
+                            const ProfileScreen(),
+                            '/perfil',
+                          ),
+                        if (currentRoute != '/ponto')
+                          _drawerItem(
+                            context,
+                            Icons.access_time,
+                            'Ponto',
+                            const PontoScreen(),
+                            '/ponto',
+                          ),
+                        if (Permissions.podeVerPropriedades(cargo) &&
+                            currentRoute != '/propriedades')
+                          _drawerItem(
+                            context,
+                            Icons.home,
+                            'Propriedades',
+                            const PropriedadesScreen(),
+                            '/propriedades',
+                          ),
+                        if (Permissions.podeVerLavanderia(cargo) &&
+                            currentRoute != '/lavanderia')
+                          _drawerItem(
+                            context,
+                            Icons.local_laundry_service,
+                            'Lavanderia',
+                            const LavanderiaScreen(),
+                            '/lavanderia',
+                          ),
+                        if (Permissions.podeVerRelatorios(cargo) &&
+                            currentRoute != '/relatorios')
+                          _drawerItem(
+                            context,
+                            Icons.bar_chart,
+                            'Relatórios',
+                            const RelatoriosScreen(),
+                            '/relatorios',
+                          ),
+                        if (Permissions.podeVerEquipe(cargo) &&
+                            currentRoute != '/equipe')
+                          _drawerItem(
+                            context,
+                            Icons.group,
+                            'Equipe',
+                            const EquipeScreen(),
+                            '/equipe',
+                          ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: ListTile(
+                      leading: const Icon(Icons.logout, color: Colors.white),
+                      title: const Text(
+                        'Logout',
+                        style: TextStyle(color: Colors.white),
                       ),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        Navigator.of(
+                          context,
+                        ).popUntil((route) => route.isFirst);
+                        await AuthService.logout(context);
+                      },
                     ),
-                    Text(
-                      cargo,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
               ),
-              const SizedBox(height: 14),
-              Expanded(
-                child: ListView(
-                  padding: EdgeInsets.zero,
-                  children: [
-                    if (currentRoute != '/dashboard')
-                      _item(
-                        context,
-                        Icons.dashboard,
-                        'Dashboard',
-                        const DashboardScreen(),
-                        '/dashboard',
-                      ),
-                    if (currentRoute != '/perfil')
-                      _item(
-                        context,
-                        Icons.person,
-                        'Perfil',
-                        const ProfileScreen(),
-                        '/perfil',
-                      ),
-                    if (currentRoute != '/ponto')
-                      _item(
-                        context,
-                        Icons.access_time,
-                        'Ponto',
-                        const PontoScreen(),
-                        '/ponto',
-                      ),
-                    if (Permissions.podeVerPropriedades(cargo) &&
-                        currentRoute != '/propriedades')
-                      _item(
-                        context,
-                        Icons.home,
-                        'Propriedades',
-                        const PropriedadesScreen(),
-                        '/propriedades',
-                      ),
-                    if (Permissions.podeVerTarefas(cargo) &&
-                        currentRoute != '/tarefas')
-                      _item(
-                        context,
-                        Icons.task,
-                        'Tarefas',
-                        const TarefasScreen(),
-                        '/tarefas',
-                      ),
-                    if (Permissions.podeVerLavanderia(cargo) &&
-                        currentRoute != '/lavanderia')
-                      _item(
-                        context,
-                        Icons.local_laundry_service,
-                        'Lavanderia',
-                        const LavanderiaScreen(),
-                        '/lavanderia',
-                      ),
-                    if (Permissions.podeVerRelatorios(cargo) &&
-                        currentRoute != '/relatorios')
-                      _item(
-                        context,
-                        Icons.bar_chart,
-                        'Relatórios',
-                        const RelatoriosScreen(),
-                        '/relatorios',
-                      ),
-                    if (Permissions.podeVerEquipe(cargo) &&
-                        currentRoute != '/equipe')
-                      _item(
-                        context,
-                        Icons.group,
-                        'Equipe',
-                        const EquipeScreen(),
-                        '/equipe',
-                      ),
-                  ],
-                ),
-              ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.logout, color: Colors.red),
-                title: const Text('Sair', style: TextStyle(color: Colors.red)),
-                onTap: () async {
-                  Navigator.pop(context);
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                  await AuthService.logout(context);
-                },
-              ),
-              const SizedBox(height: 14),
-            ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _item(
+  Widget _drawerItem(
     BuildContext context,
     IconData icon,
-    String title,
+    String label,
     Widget screen,
     String route,
   ) {
     return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
+      leading: Icon(icon, color: Colors.white, size: 26),
+      title: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 17,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+      horizontalTitleGap: 10,
       onTap: () {
         Navigator.pop(context);
         if (ModalRoute.of(context)?.settings.name != route) {
