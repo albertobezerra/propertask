@@ -7,15 +7,31 @@ import 'package:propertask/core/providers/app_state.dart';
 import 'package:propertask/core/services/firestore_service.dart';
 import 'package:propertask/widgets/tarefa_card.dart';
 
-class DashboardEmpregadoScreen extends StatelessWidget {
+class DashboardEmpregadoScreen extends StatefulWidget {
   const DashboardEmpregadoScreen({super.key});
+
+  @override
+  State<DashboardEmpregadoScreen> createState() =>
+      _DashboardEmpregadoScreenState();
+}
+
+class _DashboardEmpregadoScreenState extends State<DashboardEmpregadoScreen> {
+  DateTime _selectedDate = DateTime.now();
+
+  List<DateTime> getFiveDayWindow(DateTime center) {
+    return List.generate(5, (i) => center.subtract(Duration(days: 2 - i)));
+  }
+
+  void _handleDateTap(DateTime clickedDate) {
+    if (clickedDate.isAtSameMomentAs(_selectedDate)) return;
+    setState(() => _selectedDate = clickedDate);
+  }
 
   @override
   Widget build(BuildContext context) {
     final appState = Provider.of<AppState>(context);
     final user = appState.user;
     final usuario = appState.usuario;
-
     final cs = Theme.of(context).colorScheme;
 
     if (user == null || usuario == null) {
@@ -34,11 +50,11 @@ class DashboardEmpregadoScreen extends StatelessWidget {
     }
 
     final cargo = usuario.cargo.toUpperCase();
-    final hoje = DateTime.now();
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Dashboard - ${Formatters.formatDate(hoje)}'),
+        title: const Text('Dashboard'),
+        centerTitle: true,
         backgroundColor: cs.surface,
         foregroundColor: cs.primary,
         elevation: 0,
@@ -46,125 +62,71 @@ class DashboardEmpregadoScreen extends StatelessWidget {
       drawer: const AppDrawer(currentRoute: '/dashboard'),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
-        child: StreamBuilder<List<Tarefa>>(
-          stream: FirestoreService().getTarefasDoDia(hoje, user.uid, cargo),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return _emptyState(cs);
-            }
-            final tarefas = snapshot.data!;
-            final pendentes = tarefas
-                .where((t) => t.status != 'concluida')
-                .toList();
-            final concluidas = tarefas
-                .where((t) => t.status == 'concluida')
-                .toList();
-
-            // Calcula percentuais
-            final percentConcluidas = tarefas.isNotEmpty
-                ? (concluidas.length / tarefas.length * 100).round()
-                : 0;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header com avatar e saudação
-                _headerUser(context, usuario, user, cs, percentConcluidas),
-                const SizedBox(height: 18),
-                // Cards stats
-                Row(
-                  children: [
-                    _statCard(
-                      context,
-                      'Pendentes',
-                      pendentes.length,
-                      cs.primary,
-                    ),
-                    _statCard(
-                      context,
-                      'Concluídas',
-                      concluidas.length,
-                      cs.secondary,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                Expanded(
-                  child: ListView(
-                    padding: EdgeInsets.zero,
-                    children: [
-                      _buildSection('Pendentes', pendentes, cs.primary),
-                      _buildSection('Concluídas', concluidas, cs.secondary),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: cs.primary,
-        child: const Icon(Icons.add, color: Colors.white),
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Adicionar tarefa em breve!')),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _headerUser(
-    BuildContext context,
-    usuario,
-    user,
-    ColorScheme cs,
-    int percentConcluidas,
-  ) {
-    return Row(
-      children: [
-        CircleAvatar(
-          backgroundColor: cs.primaryContainer,
-          radius: 28,
-          child: Icon(Icons.person, size: 28, color: cs.primary),
-        ),
-        const SizedBox(width: 15),
-        Column(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Olá,', style: TextStyle(fontSize: 16, color: cs.primary)),
-            Text(
-              usuario.nome ?? user.email ?? 'Usuário',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: cs.onSurface,
+            _buildCalendar(cs),
+            const SizedBox(height: 18),
+            Expanded(
+              child: StreamBuilder<List<Tarefa>>(
+                stream: FirestoreService().getTarefasDoDia(
+                  _selectedDate,
+                  user.uid,
+                  cargo,
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return _emptyState(cs);
+                  }
+                  final tarefas = snapshot.data!;
+                  final emAberto = tarefas
+                      .where(
+                        (t) =>
+                            t.status == 'em_aberto' || t.status == 'pendente',
+                      )
+                      .toList();
+                  final emAndamento = tarefas
+                      .where(
+                        (t) =>
+                            t.status == 'em_andamento' ||
+                            t.status == 'progresso',
+                      )
+                      .toList();
+                  final concluidas = tarefas
+                      .where((t) => t.status == 'concluida')
+                      .toList();
+                  return ListView(
+                    padding: EdgeInsets.zero,
+                    children: [
+                      _buildStatusSection(
+                        'Em Aberto',
+                        emAberto,
+                        cs.primary,
+                        Icons.hourglass_empty,
+                      ),
+                      _buildStatusSection(
+                        'Em Andamento',
+                        emAndamento,
+                        Colors.orange,
+                        Icons.play_arrow_rounded,
+                      ),
+                      _buildStatusSection(
+                        'Concluída',
+                        concluidas,
+                        Colors.green,
+                        Icons.check_circle,
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
-            Text(
-              usuario.cargo ?? '',
-              style: TextStyle(fontSize: 13, color: cs.outline),
-            ),
-            const SizedBox(height: 5),
-            // Percentual de tarefas concluídas
-            if (percentConcluidas > 0)
-              Row(
-                children: [
-                  Icon(Icons.check_circle, color: cs.secondary, size: 18),
-                  const SizedBox(width: 4),
-                  Text(
-                    '$percentConcluidas% do dia concluído',
-                    style: TextStyle(fontSize: 13, color: cs.secondary),
-                  ),
-                ],
-              ),
           ],
         ),
-      ],
+      ),
     );
   }
 
@@ -180,7 +142,7 @@ class DashboardEmpregadoScreen extends StatelessWidget {
           ),
           const SizedBox(height: 15),
           Text(
-            'Nenhuma tarefa para hoje',
+            'Nenhuma tarefa para este dia',
             style: TextStyle(fontSize: 18, color: cs.outline),
             textAlign: TextAlign.center,
           ),
@@ -189,57 +151,99 @@ class DashboardEmpregadoScreen extends StatelessWidget {
     );
   }
 
-  Widget _statCard(BuildContext context, String label, int value, Color color) {
-    final cs = Theme.of(context).colorScheme;
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.only(right: 12),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.11),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: [
-            BoxShadow(
-              color: cs.primary.withValues(alpha: 0.04),
-              blurRadius: 3,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Text(
-              '$value',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-                color: color,
+  Widget _buildCalendar(ColorScheme cs) {
+    final days = getFiveDayWindow(_selectedDate);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: days.map((date) {
+        final isSelected =
+            date.day == _selectedDate.day &&
+            date.month == _selectedDate.month &&
+            date.year == _selectedDate.year;
+        final isToday =
+            date.day == DateTime.now().day &&
+            date.month == DateTime.now().month &&
+            date.year == DateTime.now().year;
+        return GestureDetector(
+          onTap: () => _handleDateTap(date),
+          child: Container(
+            width: 60,
+            padding: EdgeInsets.symmetric(vertical: 12),
+            margin: EdgeInsets.symmetric(horizontal: 3),
+            decoration: BoxDecoration(
+              color: isSelected ? cs.primary : cs.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isToday ? Colors.amber : cs.primary,
+                width: isSelected ? 2 : 1,
               ),
             ),
-            Text(label, style: TextStyle(fontSize: 15, color: color)),
-          ],
-        ),
-      ),
+            child: Column(
+              children: [
+                Text(
+                  '${date.day}',
+                  style: TextStyle(
+                    color: isSelected ? cs.onPrimary : cs.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+                Text(
+                  Formatters.weekdayAbbr(date),
+                  style: TextStyle(
+                    color: isSelected ? cs.onPrimary : cs.outline,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
-  Widget _buildSection(String title, List<Tarefa> tarefas, Color color) {
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ExpansionTile(
-        collapsedBackgroundColor: color.withValues(alpha: 0.09),
-        backgroundColor: color.withValues(alpha: 0.08),
-        title: Text(
-          '$title (${tarefas.length})',
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
+  Widget _buildStatusSection(
+    String title,
+    List<Tarefa> tarefas,
+    Color color,
+    IconData icon,
+  ) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 7),
+      padding: const EdgeInsets.all(14),
+      width: double.infinity, // ocupa toda a largura possível
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              SizedBox(width: 7),
+              Text(
+                title,
+                style: TextStyle(color: color, fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
-        ),
-        children: tarefas.map((t) => TarefaCard(tarefa: t)).toList(),
+          SizedBox(height: 11),
+          if (tarefas.isEmpty)
+            Text(
+              'Nenhuma tarefa ${title.toLowerCase()}.',
+              style: TextStyle(color: color.withValues(alpha: 0.65)),
+            ),
+          ...tarefas.map(
+            (t) => Container(
+              margin: EdgeInsets.only(bottom: 8),
+              width: double.infinity,
+              child: TarefaCard(tarefa: t),
+            ),
+          ),
+        ],
       ),
     );
   }

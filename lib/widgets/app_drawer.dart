@@ -24,6 +24,7 @@ class AppDrawer extends StatelessWidget {
     final image = await picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       showDialog(
+        // ignore: use_build_context_synchronously
         context: context,
         barrierDismissible: false,
         builder: (_) => const Center(child: CircularProgressIndicator()),

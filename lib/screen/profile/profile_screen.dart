@@ -1,290 +1,245 @@
-// lib/screen/profile/profile_screen.dart
-import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:propertask/widgets/app_drawer.dart';
-// Descomente quando for usar Cloudinary de fato
-// import 'package:cloudinary_public/cloudinary_public.dart';
+import 'package:provider/provider.dart';
+import 'package:propertask/core/providers/app_state.dart';
+import 'package:propertask/widgets/app_drawer.dart'; // Troque pelo seu Drawer
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
-}
+  Widget build(BuildContext context) {
+    return Consumer<AppState>(
+      builder: (context, appState, child) {
+        final usuario = appState.usuario;
 
-class _ProfileScreenState extends State<ProfileScreen> {
-  String? _localAvatarPath;
-  final _picker = ImagePicker();
+        if (usuario == null) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-  @override
-  void initState() {
-    super.initState();
-    // Carrega avatar local salvo anteriormente (se existir)
-    _loadLocalAvatar();
-  }
+        final avatarUrl = usuario.fotoUrl;
+        final nome = usuario.nome;
+        final departamento = usuario.cargo;
+        final telefone = usuario.telefone ?? '';
+        final email = usuario.email;
 
-  Future<void> _loadLocalAvatar() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      // Procura um arquivo salvo previamente com nome fixo
-      final docsDir = await getApplicationDocumentsDirectory();
-      final candidate = File('${docsDir.path}/avatar_${user.uid}.jpg');
-      if (await candidate.exists()) {
-        if (!mounted) return;
-        setState(() => _localAvatarPath = candidate.path);
-      }
-    } catch (_) {
-      // silencioso
-    }
-  }
-
-  Future<void> _pickAvatar(ImageSource source) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      final picked = await _picker.pickImage(source: source);
-      if (picked == null) return;
-
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      // Copia para pasta do app com nome determinístico (persiste entre execuções)
-      final docsDir = await getApplicationDocumentsDirectory();
-      final dest = File('${docsDir.path}/avatar_${user.uid}.jpg');
-      await File(picked.path).copy(dest.path);
-
-      if (!mounted) return;
-      setState(() => _localAvatarPath = dest.path);
-
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Foto atualizada com sucesso.')),
-      );
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Erro ao selecionar foto: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _editarTelefone(
-    DocumentReference<Map<String, dynamic>> userRef,
-    String? atual,
-  ) async {
-    final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    final controller = TextEditingController(text: atual ?? '');
-
-    await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Editar telefone'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.phone,
-          decoration: const InputDecoration(
-            hintText: '(DDD) 99999-9999',
-            prefixIcon: Icon(Icons.phone),
+        return Scaffold(
+          backgroundColor: const Color(
+            0xFF1A5B53,
+          ), // fundo do app igual ao mockup
+          drawer: AppDrawer(currentRoute: '/perfil'), // Drawer integrado!
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: Builder(
+              builder: (context) => IconButton(
+                icon: Icon(Icons.menu, color: Colors.white),
+                onPressed: () => Scaffold.of(context).openDrawer(),
+                tooltip: "Abrir menu",
+              ),
+            ),
+            centerTitle: true,
+            title: const Text(
+              'Perfil',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => navigator.pop(),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              try {
-                await userRef.update({'telefone': controller.text.trim()});
-                if (!mounted) return;
-                navigator.pop();
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Telefone atualizado.')),
-                );
-              } catch (e) {
-                if (!mounted) return;
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text('Erro: $e'),
-                    backgroundColor: Colors.red,
+          body: Stack(
+            children: [
+              Positioned(
+                top: -120,
+                left: -80,
+                child: Container(
+                  width: 260,
+                  height: 260,
+                  decoration: BoxDecoration(
+                    color: Color(0xFF3AB09C), // verde teal mockup
+                    shape: BoxShape.circle,
                   ),
-                );
-              }
-            },
-            child: const Text('Salvar'),
+                ),
+              ),
+              SafeArea(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 40),
+                        // Card branco arredondado com dados
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.only(
+                                top: 64,
+                                bottom: 22,
+                                left: 20,
+                                right: 20,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(28),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black12,
+                                    blurRadius: 20,
+                                    offset: Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    nome,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF133E35),
+                                      fontSize: 22,
+                                    ),
+                                  ),
+                                  if (telefone.isNotEmpty)
+                                    Text(
+                                      telefone,
+                                      style: TextStyle(
+                                        color: Color(0xFF5A9E8B),
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  if (departamento.isNotEmpty)
+                                    Text(
+                                      departamento,
+                                      style: TextStyle(
+                                        color: Color(0xFF45C3B7),
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  Text(
+                                    email,
+                                    style: TextStyle(
+                                      color: Colors.black38,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Avatar, fora do card branco
+                            Positioned(
+                              top: -43,
+                              left: 0,
+                              right: 0,
+                              child: Center(
+                                child: CircleAvatar(
+                                  radius: 43,
+                                  backgroundColor: Color(0xFF3AB09C),
+                                  backgroundImage:
+                                      (avatarUrl != null &&
+                                          avatarUrl.isNotEmpty)
+                                      ? NetworkImage(avatarUrl)
+                                      : null,
+                                  child: avatarUrl == null || avatarUrl.isEmpty
+                                      ? Icon(
+                                          Icons.person,
+                                          size: 46,
+                                          color: Colors.white,
+                                        )
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 30),
+                        cardOpcao(
+                          icon: Icons.language,
+                          label: "Idioma",
+                          trailing: "Português",
+                        ),
+                        cardOpcao(icon: Icons.lock, label: "Alterar senha"),
+                        cardOpcao(
+                          icon: Icons.privacy_tip_outlined,
+                          label: "Privacidade",
+                        ),
+                        cardOpcao(
+                          icon: Icons.description_outlined,
+                          label: "Termos de uso",
+                        ),
+                        const SizedBox(height: 32),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF3AB09C),
+                              padding: EdgeInsets.symmetric(vertical: 15),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              elevation: 0,
+                            ),
+                            onPressed: () {}, // Deslogar
+                            child: Text(
+                              "Sair",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 17,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 36),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Card flat de opção igual ao mockup
+  Widget cardOpcao({
+    required IconData icon,
+    required String label,
+    String? trailing,
+  }) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x19000000),
+            blurRadius: 6,
+            offset: Offset(0, 2),
           ),
         ],
       ),
-    );
-  }
-
-  // PREPARADO para futura integração Cloudinary (não usado agora).
-  // Preencha CLOUD_NAME e UPLOAD_PRESET e chame dentro do _pickAvatar quando desejar.
-  // Future<void> _uploadToCloudinary(File file, DocumentReference<Map<String, dynamic>> userRef) async {
-  //   try {
-  //     final cloudinary = CloudinaryPublic('CLOUD_NAME', 'UPLOAD_PRESET', cache: false);
-  //     final res = await cloudinary.uploadFile(
-  //       CloudinaryFile.fromFile(file.path, folder: 'propertask/avatars'),
-  //     );
-  //     await userRef.update({'fotoUrl': res.secureUrl});
-  //   } catch (e) {
-  //     // Trate erro conforme necessário
-  //   }
-  // }
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return const SizedBox();
-
-    final userRef = FirebaseFirestore.instance
-        .collection('propertask')
-        .doc('usuarios')
-        .collection('usuarios')
-        .doc(user.uid)
-        .withConverter<Map<String, dynamic>>(
-          fromFirestore: (snap, _) => snap.data() ?? <String, dynamic>{},
-          toFirestore: (data, _) => data,
-        );
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Perfil'),
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
-        ),
-      ),
-      drawer: const AppDrawer(currentRoute: '/perfil'),
-      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: userRef.snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting ||
-              !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.data!.exists) {
-            return const Center(child: Text('Usuário não encontrado'));
-          }
-
-          final data = snapshot.data!.data()!;
-          final nome = (data['nome'] ?? '').toString();
-          final email = (data['email'] ?? user.email ?? '').toString();
-          final cargo = (data['cargo'] ?? 'Colaborador').toString();
-          final telefone = (data['telefone'] ?? '').toString();
-          final fotoUrl = (data['fotoUrl'] ?? '')
-              .toString(); // futuro (Cloudinary)
-
-          return ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              Center(
-                child: Stack(
-                  alignment: Alignment.bottomRight,
-                  children: [
-                    CircleAvatar(
-                      radius: 60,
-                      backgroundColor: Colors.blue.shade100,
-                      backgroundImage: _localAvatarPath != null
-                          ? FileImage(File(_localAvatarPath!))
-                          : (fotoUrl.isNotEmpty
-                                ? NetworkImage(fotoUrl) as ImageProvider
-                                : null),
-                      child: (_localAvatarPath == null && fotoUrl.isEmpty)
-                          ? Text(
-                              nome.isNotEmpty ? nome[0].toUpperCase() : 'U',
-                              style: const TextStyle(
-                                fontSize: 50,
-                                color: Colors.blue,
-                              ),
-                            )
-                          : null,
-                    ),
-                    PopupMenuButton<String>(
-                      icon: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: Colors.blue.shade700,
-                        child: const Icon(
-                          Icons.edit,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                      ),
-                      onSelected: (v) async {
-                        if (v == 'camera') {
-                          await _pickAvatar(ImageSource.camera);
-                        } else if (v == 'galeria') {
-                          await _pickAvatar(ImageSource.gallery);
-                        } else if (v == 'remover') {
-                          // Remove imagem local
-                          if (_localAvatarPath != null) {
-                            try {
-                              final f = File(_localAvatarPath!);
-                              if (await f.exists()) await f.delete();
-                            } catch (_) {}
-                            if (!mounted) return;
-                            setState(() => _localAvatarPath = null);
-                          }
-                        }
-                      },
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'camera', child: Text('Câmera')),
-                        PopupMenuItem(value: 'galeria', child: Text('Galeria')),
-                        PopupMenuItem(
-                          value: 'remover',
-                          child: Text('Remover foto'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              _info('Nome', nome, icon: Icons.person),
-              _info('Email', email, icon: Icons.email),
-              _info('Cargo', cargo, icon: Icons.work),
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.phone, color: Colors.blue),
-                  title: const Text(
-                    'Telefone',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(telefone.isEmpty ? 'Não informado' : telefone),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: () => _editarTelefone(userRef, telefone),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              // (Opcional) Mostrar origem atual
-              // Text('Foto local: ${_localAvatarPath ?? "-"}'),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _info(String label, String value, {required IconData icon}) {
-    return Card(
       child: ListTile(
-        leading: Icon(icon, color: Colors.blue),
-        title: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(value.isEmpty ? 'Não informado' : value),
+        leading: Icon(icon, color: Color(0xFF3AB09C), size: 26),
+        title: Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
+        trailing: trailing != null
+            ? Text(
+                trailing,
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF3AB09C),
+                ),
+              )
+            : null,
+        dense: true,
+        visualDensity: VisualDensity.compact,
+        onTap: () {},
       ),
     );
   }
