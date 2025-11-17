@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
@@ -6,16 +7,28 @@ import 'package:image_picker/image_picker.dart';
 class StorageService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  // Foto de perfil
-  Future<String> uploadUserProfileImage(XFile file, String userId) async {
-    final ref = _storage.ref().child(
-      'propertask/perfil/$userId/${DateTime.now().millisecondsSinceEpoch}_${file.name}',
-    );
-    final snapshot = await ref.putFile(File(file.path));
+  // Foto de perfil (com upload de bytes já comprimido)
+  Future<String> uploadUserProfileImageBytes(
+    Uint8List bytes,
+    String userId,
+  ) async {
+    final filename = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final ref = _storage.ref().child('propertask/perfil/$userId/$filename');
+    final snapshot = await ref.putData(bytes);
     return await snapshot.ref.getDownloadURL();
   }
 
-  // Foto propriedade
+  // Exclui foto anterior
+  Future<void> deleteFileFromUrl(String url) async {
+    try {
+      final ref = _storage.refFromURL(url);
+      await ref.delete();
+    } catch (_) {
+      /* ignore errors */
+    }
+  }
+
+  // Métodos antigos mantidos para propriedade/tarefa
   Future<String> uploadPropriedadeImage(
     XFile file,
     String propriedadeId,
@@ -27,7 +40,6 @@ class StorageService {
     return await snapshot.ref.getDownloadURL();
   }
 
-  // Foto tarefa
   Future<String> uploadTarefaImage(
     XFile file,
     String propriedadeId,

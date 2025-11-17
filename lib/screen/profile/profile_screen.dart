@@ -1,34 +1,84 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:propertask/widgets/app_drawer.dart';
 import 'package:provider/provider.dart';
 import 'package:propertask/core/providers/app_state.dart';
-import 'package:propertask/widgets/app_drawer.dart'; // Troque pelo seu Drawer
+import 'package:propertask/core/services/storage_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  Future<void> _updateAvatar(
+    BuildContext context,
+    String userId,
+    String? oldFotoUrl,
+  ) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const Center(child: CircularProgressIndicator()),
+        );
+      }
+      try {
+        final imgBytes = await picked.readAsBytes();
+        final compressed = await FlutterImageCompress.compressWithList(
+          imgBytes,
+          minWidth: 400,
+          minHeight: 400,
+          quality: 80,
+        );
+        if (oldFotoUrl != null && oldFotoUrl.isNotEmpty) {
+          await StorageService().deleteFileFromUrl(oldFotoUrl);
+        }
+        if (!context.mounted) return;
+        final url = await StorageService().uploadUserProfileImageBytes(
+          Uint8List.fromList(compressed),
+          userId,
+        );
+        if (!context.mounted) return;
+        await Provider.of<AppState>(
+          context,
+          listen: false,
+        ).atualizarFotoUsuario(url);
+        if (!context.mounted) return;
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Foto atualizada!')));
+      } catch (e) {
+        if (context.mounted) {
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Erro: $e')));
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, appState, child) {
         final usuario = appState.usuario;
-
         if (usuario == null) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        final avatarUrl = usuario.fotoUrl;
-        final nome = usuario.nome;
-        final departamento = usuario.cargo;
-        final telefone = usuario.telefone ?? '';
-        final email = usuario.email;
+        final avatarUrl = usuario.fotoUrl ?? '';
 
         return Scaffold(
-          backgroundColor: const Color(
-            0xFF1A5B53,
-          ), // fundo do app igual ao mockup
-          drawer: AppDrawer(currentRoute: '/perfil'), // Drawer integrado!
+          backgroundColor: const Color(0xFF1A5B53),
+          drawer: AppDrawer(currentRoute: '/perfil'),
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
@@ -57,7 +107,7 @@ class ProfileScreen extends StatelessWidget {
                   width: 260,
                   height: 260,
                   decoration: BoxDecoration(
-                    color: Color(0xFF3AB09C), // verde teal mockup
+                    color: Color(0xFF3AB09C),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -68,8 +118,7 @@ class ProfileScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 20.0),
                     child: Column(
                       children: [
-                        const SizedBox(height: 40),
-                        // Card branco arredondado com dados
+                        const SizedBox(height: 80),
                         Stack(
                           clipBehavior: Clip.none,
                           children: [
@@ -84,42 +133,35 @@ class ProfileScreen extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(28),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black12,
-                                    blurRadius: 20,
-                                    offset: Offset(0, 8),
-                                  ),
-                                ],
                               ),
                               child: Column(
                                 children: [
                                   Text(
-                                    nome,
+                                    usuario.nome,
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       color: Color(0xFF133E35),
                                       fontSize: 22,
                                     ),
                                   ),
-                                  if (telefone.isNotEmpty)
+                                  if ((usuario.telefone ?? '').isNotEmpty)
                                     Text(
-                                      telefone,
+                                      usuario.telefone ?? '',
                                       style: TextStyle(
                                         color: Color(0xFF5A9E8B),
                                         fontSize: 14,
                                       ),
                                     ),
-                                  if (departamento.isNotEmpty)
+                                  if ((usuario.cargo).isNotEmpty)
                                     Text(
-                                      departamento,
+                                      usuario.cargo,
                                       style: TextStyle(
                                         color: Color(0xFF45C3B7),
                                         fontSize: 14,
                                       ),
                                     ),
                                   Text(
-                                    email,
+                                    usuario.email,
                                     style: TextStyle(
                                       color: Colors.black38,
                                       fontSize: 13,
@@ -128,33 +170,84 @@ class ProfileScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            // Avatar, fora do card branco
+
                             Positioned(
-                              top: -43,
+                              top: -66,
                               left: 0,
                               right: 0,
                               child: Center(
-                                child: CircleAvatar(
-                                  radius: 43,
-                                  backgroundColor: Color(0xFF3AB09C),
-                                  backgroundImage:
-                                      (avatarUrl != null &&
-                                          avatarUrl.isNotEmpty)
-                                      ? NetworkImage(avatarUrl)
-                                      : null,
-                                  child: avatarUrl == null || avatarUrl.isEmpty
-                                      ? Icon(
-                                          Icons.person,
-                                          size: 46,
-                                          color: Colors.white,
-                                        )
-                                      : null,
+                                child: Stack(
+                                  children: [
+                                    SizedBox(
+                                      width: 120,
+                                      height: 120,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(32),
+                                        child: avatarUrl.isNotEmpty
+                                            ? CachedNetworkImage(
+                                                imageUrl: avatarUrl,
+                                                placeholder: (ctx, url) =>
+                                                    Container(
+                                                      color: Color(0xFF3AB09C),
+                                                      child: Icon(
+                                                        Icons.person,
+                                                        size: 46,
+                                                        color: Colors.white,
+                                                      ),
+                                                    ),
+                                                errorWidget:
+                                                    (ctx, url, error) =>
+                                                        Container(
+                                                          color: Color(
+                                                            0xFF3AB09C,
+                                                          ),
+                                                          child: Icon(
+                                                            Icons.person,
+                                                            size: 46,
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
+                                                fit: BoxFit.cover,
+                                              )
+                                            : Container(
+                                                color: Color(0xFF3AB09C),
+                                                child: Icon(
+                                                  Icons.person,
+                                                  size: 46,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: 0,
+                                      right: 0,
+                                      child: GestureDetector(
+                                        onTap: () => _updateAvatar(
+                                          context,
+                                          usuario.id,
+                                          usuario.fotoUrl,
+                                        ),
+                                        child: Container(
+                                          decoration: const BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Colors.white,
+                                          ),
+                                          padding: const EdgeInsets.all(6),
+                                          child: const Icon(
+                                            Icons.camera_alt,
+                                            color: Color(0xFF3AB09C),
+                                            size: 22,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 30),
                         cardOpcao(
                           icon: Icons.language,
@@ -193,7 +286,7 @@ class ProfileScreen extends StatelessWidget {
                             ),
                           ),
                         ),
-                        SizedBox(height: 36),
+                        const SizedBox(height: 36),
                       ],
                     ),
                   ),
@@ -206,7 +299,6 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  // Card flat de opção igual ao mockup
   Widget cardOpcao({
     required IconData icon,
     required String label,
@@ -217,13 +309,6 @@ class ProfileScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x19000000),
-            blurRadius: 6,
-            offset: Offset(0, 2),
-          ),
-        ],
       ),
       child: ListTile(
         leading: Icon(icon, color: Color(0xFF3AB09C), size: 26),

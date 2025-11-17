@@ -11,46 +11,11 @@ import 'package:propertask/screen/relatorios/relatorios_screen.dart';
 import 'package:propertask/screen/ponto/ponto_screen.dart';
 import 'package:propertask/screen/lavanderia/lavanderia_screen.dart';
 import 'package:propertask/screen/equipe/equipe_screen.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:propertask/core/services/storage_service.dart';
 
 class AppDrawer extends StatelessWidget {
   final String currentRoute;
 
   const AppDrawer({super.key, required this.currentRoute});
-
-  Future<void> _updateAvatar(BuildContext context, AppState appState) async {
-    final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      showDialog(
-        // ignore: use_build_context_synchronously
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => const Center(child: CircularProgressIndicator()),
-      );
-      try {
-        final url = await StorageService().uploadUserProfileImage(
-          image,
-          appState.usuario!.id,
-        );
-        if (context.mounted) Navigator.of(context).pop(); // fecha o loading
-        await appState.atualizarFotoUsuario(url);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Foto atualizada com sucesso!')),
-          );
-        }
-      } catch (e) {
-        if (context.mounted) Navigator.of(context).pop();
-        if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Erro ao subir imagem: $e')));
-        }
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,36 +36,34 @@ class AppDrawer extends StatelessWidget {
 
         return Drawer(
           child: Container(
-            color: const Color(
-              0xFF6AB090,
-            ), // ajustável para seu verde principal
+            decoration: const BoxDecoration(color: Color(0xFF6AB090)),
             child: SafeArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const SizedBox(height: 32),
                   Center(
-                    child: GestureDetector(
-                      onTap: () => _updateAvatar(context, appState),
-                      child: CircleAvatar(
-                        radius: 60,
-                        backgroundColor: Colors.blueAccent,
-                        backgroundImage:
-                            (avatarUrl != null && avatarUrl.isNotEmpty)
-                            ? NetworkImage(avatarUrl)
-                            : null,
-                        child: avatarUrl == null || avatarUrl.isEmpty
-                            ? Icon(
-                                Icons.person,
-                                size: 40,
-                                color: const Color(0xFF6AB090),
-                              )
-                            : null,
-                      ),
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 60,
+                          backgroundColor: Colors.white,
+                          backgroundImage:
+                              avatarUrl != null && avatarUrl.isNotEmpty
+                              ? NetworkImage(avatarUrl)
+                              : null,
+                          child: avatarUrl == null || avatarUrl.isEmpty
+                              ? Icon(
+                                  Icons.person,
+                                  size: 44,
+                                  color: Color(0xFF6AB090),
+                                )
+                              : null,
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 22),
-                  const SizedBox(height: 2),
                   Text(
                     name,
                     style: const TextStyle(
@@ -112,13 +75,12 @@ class AppDrawer extends StatelessWidget {
                   Text(
                     cargo,
                     style: TextStyle(
-                      color: Colors.white..withValues(alpha: 0.67),
+                      color: Colors.white.withValues(alpha: 0.67),
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 28),
-                  // --- MENU INTELIGENTE POR PERMISSÃO ---
                   Expanded(
                     child: ListView(
                       padding: const EdgeInsets.symmetric(

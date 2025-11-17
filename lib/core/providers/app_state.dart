@@ -53,7 +53,7 @@ class AppState with ChangeNotifier {
       criadoEm: _usuario!.criadoEm,
       ativo: _usuario!.ativo,
     );
-    notifyListeners();
+    notifyListeners(); // <- Notifica ANTES de salvar no banco!
     await FirebaseFirestore.instance
         .collection('propertask')
         .doc('usuarios')
