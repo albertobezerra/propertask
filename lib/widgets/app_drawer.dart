@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:propertask/core/services/auth_service.dart';
 import 'package:provider/provider.dart';
 import 'package:propertask/core/providers/app_state.dart';
 import 'package:propertask/core/utils/permissions.dart';
@@ -36,7 +35,7 @@ class AppDrawer extends StatelessWidget {
 
         return Drawer(
           child: Container(
-            decoration: const BoxDecoration(color: Color(0xFF6AB090)),
+            color: Theme.of(context).colorScheme.primary,
             child: SafeArea(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -160,24 +159,6 @@ class AppDrawer extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: ListTile(
-                      leading: const Icon(Icons.logout, color: Colors.white),
-                      title: const Text(
-                        'Logout',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      onTap: () async {
-                        Navigator.pop(context);
-                        Navigator.of(
-                          context,
-                        ).popUntil((route) => route.isFirst);
-                        await AuthService.logout(context);
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                 ],
               ),
             ),

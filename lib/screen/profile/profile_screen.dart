@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:propertask/core/services/auth_service.dart';
 import 'package:propertask/widgets/app_drawer.dart';
 import 'package:provider/provider.dart';
 import 'package:propertask/core/providers/app_state.dart';
@@ -275,7 +276,13 @@ class ProfileScreen extends StatelessWidget {
                               ),
                               elevation: 0,
                             ),
-                            onPressed: () {}, // Deslogar
+                            onPressed: () async {
+                              Navigator.pop(context);
+                              Navigator.of(
+                                context,
+                              ).popUntil((route) => route.isFirst);
+                              await AuthService.logout(context);
+                            }, // Deslogar
                             child: Text(
                               "Sair",
                               style: TextStyle(

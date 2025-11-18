@@ -9,7 +9,6 @@ import 'package:propertask/widgets/tarefa_card.dart';
 
 class DashboardEmpregadoScreen extends StatefulWidget {
   const DashboardEmpregadoScreen({super.key});
-
   @override
   State<DashboardEmpregadoScreen> createState() =>
       _DashboardEmpregadoScreenState();
@@ -18,10 +17,8 @@ class DashboardEmpregadoScreen extends StatefulWidget {
 class _DashboardEmpregadoScreenState extends State<DashboardEmpregadoScreen> {
   DateTime _selectedDate = DateTime.now();
 
-  List<DateTime> getFiveDayWindow(DateTime center) {
-    return List.generate(5, (i) => center.subtract(Duration(days: 2 - i)));
-  }
-
+  List<DateTime> getFiveDayWindow(DateTime center) =>
+      List.generate(5, (i) => center.subtract(Duration(days: 2 - i)));
   void _handleDateTap(DateTime clickedDate) {
     if (clickedDate.isAtSameMomentAs(_selectedDate)) return;
     setState(() => _selectedDate = clickedDate);
@@ -110,13 +107,13 @@ class _DashboardEmpregadoScreenState extends State<DashboardEmpregadoScreen> {
                       _buildStatusSection(
                         'Em Andamento',
                         emAndamento,
-                        Colors.orange,
+                        cs.secondary,
                         Icons.play_arrow_rounded,
                       ),
                       _buildStatusSection(
                         'Concluída',
                         concluidas,
-                        Colors.green,
+                        cs.primaryContainer, // Verde CLARINHO do theme
                         Icons.check_circle,
                       ),
                     ],
@@ -168,13 +165,15 @@ class _DashboardEmpregadoScreenState extends State<DashboardEmpregadoScreen> {
           onTap: () => _handleDateTap(date),
           child: Container(
             width: 60,
-            padding: EdgeInsets.symmetric(vertical: 12),
-            margin: EdgeInsets.symmetric(horizontal: 3),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            margin: const EdgeInsets.symmetric(horizontal: 3),
             decoration: BoxDecoration(
               color: isSelected ? cs.primary : cs.surface,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: isToday ? Colors.amber : cs.primary,
+                color: isToday
+                    ? const Color.fromARGB(255, 106, 176, 144)
+                    : cs.primary,
                 width: isSelected ? 2 : 1,
               ),
             ),
@@ -212,7 +211,7 @@ class _DashboardEmpregadoScreenState extends State<DashboardEmpregadoScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 7),
       padding: const EdgeInsets.all(14),
-      width: double.infinity, // ocupa toda a largura possível
+      width: double.infinity,
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(14),
@@ -223,14 +222,14 @@ class _DashboardEmpregadoScreenState extends State<DashboardEmpregadoScreen> {
           Row(
             children: [
               Icon(icon, color: color, size: 22),
-              SizedBox(width: 7),
+              const SizedBox(width: 7),
               Text(
                 title,
                 style: TextStyle(color: color, fontWeight: FontWeight.bold),
               ),
             ],
           ),
-          SizedBox(height: 11),
+          const SizedBox(height: 11),
           if (tarefas.isEmpty)
             Text(
               'Nenhuma tarefa ${title.toLowerCase()}.',
@@ -238,7 +237,7 @@ class _DashboardEmpregadoScreenState extends State<DashboardEmpregadoScreen> {
             ),
           ...tarefas.map(
             (t) => Container(
-              margin: EdgeInsets.only(bottom: 8),
+              margin: const EdgeInsets.only(bottom: 8),
               width: double.infinity,
               child: TarefaCard(tarefa: t),
             ),
