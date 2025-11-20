@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:propertask/core/providers/app_state.dart';
+import 'package:propertask/core/utils/permissions.dart';
 
 class TarefaFormScreen extends StatefulWidget {
   final DocumentSnapshot? tarefa;
@@ -70,12 +73,18 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final usuario = Provider.of<AppState>(context).usuario;
+    final cargo = usuario?.cargo ?? 'LIMPEZA';
+    final podeAtribuir = Permissions.cargoFromString(cargo) != Cargo.limpeza;
     final locale = Localizations.localeOf(context).toString();
     final dataFmt = DateFormat('dd/MM/yyyy', locale);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.tarefa == null ? 'Nova tarefa' : 'Editar tarefa'),
+        backgroundColor: cs.primary,
+        foregroundColor: cs.onPrimary,
       ),
       body: Form(
         key: _formKey,
@@ -85,12 +94,12 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
             DropdownButtonFormField<String>(
               initialValue: _tipo,
               items: const [
-                DropdownMenuItem(value: 'limpeza', child: Text('LIMPEZA')),
-                DropdownMenuItem(value: 'entrega', child: Text('ENTREGA')),
-                DropdownMenuItem(value: 'recolha', child: Text('RECOLHA')),
+                DropdownMenuItem(value: 'limpeza', child: Text('Limpeza')),
+                DropdownMenuItem(value: 'entrega', child: Text('Entrega')),
+                DropdownMenuItem(value: 'recolha', child: Text('Recolha')),
                 DropdownMenuItem(
                   value: 'manutencao',
-                  child: Text('MANUTENÇÃO'),
+                  child: Text('Manutenção'),
                 ),
               ],
               onChanged: (v) => setState(() => _tipo = v!),
@@ -113,15 +122,20 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
                 return DropdownButtonFormField<String>(
                   initialValue: _propriedadeId,
                   hint: const Text('Selecione a propriedade'),
-                  items: props.map((p) {
-                    final nome = (p['nome'] ?? 'Sem nome').toString();
-                    return DropdownMenuItem(value: p.id, child: Text(nome));
-                  }).toList(),
+                  items: props
+                      .map(
+                        (p) => DropdownMenuItem(
+                          value: p.id,
+                          child: Text(p['nome'] ?? 'Sem nome'),
+                        ),
+                      )
+                      .toList(),
                   onChanged: (v) {
                     setState(() => _propriedadeId = v);
                     if (v != null) _loadPropriedadeSofaCama(v);
                   },
                   validator: (v) => v == null ? 'Obrigatório' : null,
+                  decoration: const InputDecoration(labelText: 'Propriedade'),
                 );
               },
             ),
@@ -131,48 +145,56 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
               CheckboxListTile(
                 value: _fazerSofaCama,
                 onChanged: (v) => setState(() => _fazerSofaCama = v ?? true),
-                title: const Text('Sofá‑cama necessário'),
+                title: const Text('Sofá-cama necessário'),
                 contentPadding: EdgeInsets.zero,
               ),
               const SizedBox(height: 8),
             ],
 
-            FutureBuilder<QuerySnapshot>(
-              future: FirebaseFirestore.instance
-                  .collection('propertask')
-                  .doc('usuarios')
-                  .collection('usuarios')
-                  .orderBy('nome')
-                  .get(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Text('Carregando usuários...');
-                }
-                final users = snapshot.data!.docs;
-                return DropdownButtonFormField<String>(
-                  initialValue: _responsavelId,
-                  hint: const Text('Atribuir a'),
-                  items: users.map((u) {
-                    final nome = (u['nome'] ?? 'Sem nome').toString();
-                    return DropdownMenuItem(value: u.id, child: Text(nome));
-                  }).toList(),
-                  onChanged: (v) => setState(() => _responsavelId = v),
-                  validator: (v) => v == null ? 'Obrigatório' : null,
-                );
-              },
-            ),
+            if (podeAtribuir)
+              FutureBuilder<QuerySnapshot>(
+                future: FirebaseFirestore.instance
+                    .collection('propertask')
+                    .doc('usuarios')
+                    .collection('usuarios')
+                    .orderBy('nome')
+                    .get(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Text('Carregando usuários...');
+                  }
+                  final users = snapshot.data!.docs;
+                  return DropdownButtonFormField<String>(
+                    initialValue: _responsavelId,
+                    hint: const Text('Atribuir a'),
+                    items: users
+                        .map(
+                          (u) => DropdownMenuItem(
+                            value: u.id,
+                            child: Text(u['nome'] ?? 'Sem nome'),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setState(() => _responsavelId = v),
+                    validator: (v) => v == null ? 'Obrigatório' : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Funcionário responsável',
+                    ),
+                  );
+                },
+              ),
             const SizedBox(height: 16),
 
             ListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('data'),
+              title: const Text('Data'),
               subtitle: Text(dataFmt.format(_data)),
               trailing: const Icon(Icons.calendar_today),
               onTap: () async {
                 final picked = await showDatePicker(
                   context: context,
                   initialDate: _data,
-                  firstDate: DateTime.now(),
+                  firstDate: DateTime.now().subtract(const Duration(days: 90)),
                   lastDate: DateTime.now().add(const Duration(days: 365)),
                 );
                 if (picked != null) setState(() => _data = picked);
@@ -182,7 +204,7 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
 
             TextFormField(
               controller: _observacoes,
-              decoration: const InputDecoration(labelText: 'observações'),
+              decoration: const InputDecoration(labelText: 'Observações'),
               textCapitalization: TextCapitalization.sentences,
               maxLines: 3,
             ),
@@ -200,13 +222,20 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
 
   Future<void> _onSalvarPressed() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_propriedadeId == null || _responsavelId == null) return;
+    if (_propriedadeId == null ||
+        (_responsavelId == null &&
+            Permissions.cargoFromString(
+                  Provider.of<AppState>(context, listen: false).usuario!.cargo,
+                ) !=
+                Cargo.limpeza)) {
+      return;
+    }
 
     final navigator = Navigator.of(context);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     try {
-      // Buscar nome da propriedade
+      // Buscar nome da propriedade para salvar
       final propDoc = await FirebaseFirestore.instance
           .collection('propertask')
           .doc('propriedades')
@@ -214,6 +243,18 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
           .doc(_propriedadeId!)
           .get();
       final propNome = (propDoc['nome'] ?? 'Propriedade').toString();
+
+      // Buscar nome do responsável (para gestores)
+      String? responsavelNome;
+      if (_responsavelId != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('propertask')
+            .doc('usuarios')
+            .collection('usuarios')
+            .doc(_responsavelId!)
+            .get();
+        responsavelNome = (userDoc['nome'] ?? 'Funcionário').toString();
+      }
 
       final dataFmt = DateFormat('dd/MM/yyyy');
       final tipoNome =
@@ -236,24 +277,23 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
         'tipo': _tipo,
         'propriedadeId': _propriedadeId,
         'propriedadeNome': propNome,
-        'responsavelId': _responsavelId,
         'status': _status,
         'data': Timestamp.fromDate(_data),
         'observacoes': _observacoes.text.trim().isEmpty
             ? null
             : _observacoes.text.trim(),
         'fazerSofaCama': _propTemSofaCama ? _fazerSofaCama : null,
+        if (_responsavelId != null) 'responsavelId': _responsavelId,
+        if (responsavelNome != null) 'responsavelNome': responsavelNome,
       };
 
       if (widget.tarefa == null) {
         await ref.add({...base, 'createdAt': FieldValue.serverTimestamp()});
-        // Não chama notificação local: Cloud Function enviará o push
       } else {
         await widget.tarefa!.reference.update({
           ...base,
           'updatedAt': FieldValue.serverTimestamp(),
         });
-        // Se mudar o responsavelId, a Function também dispara push
       }
 
       if (!mounted) return;

@@ -435,6 +435,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.32"
+  flutter_reorderable_grid_view:
+    dependency: transitive
+    description:
+      name: flutter_reorderable_grid_view
+      sha256: beb85f95325c83515d8953e8612dc70d287a69d1437c14262b7d738070133a87
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.5.2"
   flutter_secure_storage:
     dependency: "direct main"
     description:
@@ -805,6 +813,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  multi_image_picker_view:
+    dependency: "direct main"
+    description:
+      name: multi_image_picker_view
+      sha256: aa9f81fcbb27762193da659fde9c035a9d6f10828cf688d2fd45fdd012c884b5
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.0"
   nested:
     dependency: transitive
     description:
