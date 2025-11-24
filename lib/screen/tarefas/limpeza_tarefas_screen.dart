@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:propertask/screen/tarefas/tarefa_detalhe_screen.dart';
+import 'package:propertask/widgets/app_drawer.dart';
 
 class LimpezaTarefasScreen extends StatefulWidget {
   final String usuarioId;
@@ -30,14 +31,22 @@ class _LimpezaTarefasScreenState extends State<LimpezaTarefasScreen> {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Tarefas do Dia"),
+        title: const Text("Minhas Tarefas"),
         backgroundColor: cs.primary,
         foregroundColor: cs.onPrimary,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
       ),
+      drawer: const AppDrawer(currentRoute: '/tarefas'),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 8.0, bottom: 14),
+            padding: const EdgeInsets.only(top: 12, bottom: 18),
             child: _buildCalendar(cs),
           ),
           Expanded(
@@ -103,16 +112,25 @@ class _LimpezaTarefasScreenState extends State<LimpezaTarefasScreen> {
         return GestureDetector(
           onTap: () => _handleDateTap(date),
           child: Container(
-            width: 60,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            margin: const EdgeInsets.symmetric(horizontal: 3),
+            width: 56,
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            margin: const EdgeInsets.symmetric(horizontal: 2),
             decoration: BoxDecoration(
               color: isSelected ? cs.primary : cs.surface,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: isToday ? Colors.amber : cs.primary,
-                width: isSelected ? 2 : 1,
+                width: isSelected ? 2.4 : 1,
               ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: cs.primary.withAlpha(40),
+                        blurRadius: 12,
+                        offset: Offset(0, 3),
+                      ),
+                    ]
+                  : [],
             ),
             child: Column(
               children: [
@@ -155,37 +173,52 @@ class LimpezaTarefaCardNovo extends StatelessWidget {
     final tipo = data['tipo'] ?? 'limpeza';
     final prop = data['propriedadeNome'] ?? 'Propriedade';
     final status = data['status'] ?? 'pendente';
-    final primeiraLinha = '$prop - ${_formatTipo(tipo)}';
-    final statusVisivel = _formatStatusCustom(status);
+    final primeiraLinha = '$prop - ${formatTipo(tipo)}';
+    final statusVisivel = formatStatusCustom(status);
     final dataFmt = (data['data'] as Timestamp?)?.toDate();
     final dataStr = dataFmt != null ? DateFormat('dd/MM').format(dataFmt) : '';
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(
-          vertical: 12,
-          horizontal: 14,
+          vertical: 15,
+          horizontal: 16,
         ),
         leading: CircleAvatar(
-          backgroundColor: _getTipoColor(tipo, cs),
+          backgroundColor: getTipoColor(tipo, cs),
           child: getTipoIcon(tipo, color: Colors.white),
         ),
         title: Text(
           primeiraLinha,
           style: const TextStyle(fontWeight: FontWeight.bold),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 3.0),
-          child: Text(
-            statusVisivel,
-            style: TextStyle(
-              color: _getStatusColor(status, cs),
-              fontWeight: FontWeight.w500,
-            ),
+          child: Row(
+            children: [
+              Chip(
+                label: Text(
+                  statusVisivel,
+                  style: TextStyle(
+                    color: getStatusColor(status, cs),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                backgroundColor: cs.surfaceContainerHighest,
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
           ),
         ),
-        trailing: Text(dataStr, style: TextStyle(color: cs.outline)),
+        trailing: Text(
+          dataStr,
+          style: TextStyle(color: cs.outline, fontWeight: FontWeight.w500),
+        ),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
@@ -197,7 +230,8 @@ class LimpezaTarefaCardNovo extends StatelessWidget {
   }
 }
 
-String _formatTipo(String tipo) {
+// -- Helpers globais --
+String formatTipo(String tipo) {
   switch (tipo) {
     case 'limpeza':
       return 'Limpeza';
@@ -212,7 +246,7 @@ String _formatTipo(String tipo) {
   }
 }
 
-String _formatStatusCustom(String? status) {
+String formatStatusCustom(String? status) {
   switch (status) {
     case 'pendente':
       return 'Aguardando início';
@@ -227,7 +261,7 @@ String _formatStatusCustom(String? status) {
   }
 }
 
-Color _getTipoColor(String tipo, ColorScheme cs) {
+Color getTipoColor(String tipo, ColorScheme cs) {
   switch (tipo) {
     case 'limpeza':
       return cs.primary;
@@ -242,7 +276,7 @@ Color _getTipoColor(String tipo, ColorScheme cs) {
   }
 }
 
-Color _getStatusColor(String status, ColorScheme cs) {
+Color getStatusColor(String status, ColorScheme cs) {
   switch (status) {
     case 'concluida':
       return Colors.green;

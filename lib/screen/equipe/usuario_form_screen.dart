@@ -1,4 +1,3 @@
-// lib/screen/equipe/usuario_form_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -46,83 +45,106 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.usuario != null;
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(isEdit ? 'Editar Funcionário' : 'Convidar Funcionário'),
-        centerTitle: true,
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
+        backgroundColor: cs.primary,
+        foregroundColor: cs.onPrimary,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: 'Fechar',
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
       ),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
           children: [
-            TextFormField(
-              controller: _nome,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Nome completo *',
-                prefixIcon: Icon(Icons.person),
-              ),
-              validator: (v) => v!.trim().isEmpty ? 'Digite o nome' : null,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _email,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'E-mail *',
-                prefixIcon: Icon(Icons.email),
-              ),
-              validator: (v) => v!.contains('@') ? null : 'E-mail inválido',
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              initialValue: _cargo,
-              items:
-                  const [
-                        'LIMPEZA',
-                        'LAVANDERIA',
-                        'MOTORISTA',
-                        'SUPERVISOR',
-                        'COORDENADOR',
-                        'CEO',
-                        'DEV',
-                        'RH',
-                      ]
-                      .map(
-                        (c) => DropdownMenuItem(
-                          value: c,
-                          child: Text(_formatCargoStatic(c)),
-                        ),
-                      )
-                      .toList(),
-              onChanged: (v) => setState(() => _cargo = v!),
-              decoration: const InputDecoration(
-                labelText: 'Cargo',
-                prefixIcon: Icon(Icons.work),
-              ),
-            ),
-            const SizedBox(height: 16),
             Card(
-              child: SwitchListTile(
-                title: const Text('Status do Usuário'),
-                subtitle: Text(
-                  _ativo ? 'Ativo (pode logar)' : 'Inativo (bloqueado)',
+              color: cs.surfaceContainerHighest,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    TextFormField(
+                      controller: _nome,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome completo *',
+                        prefixIcon: Icon(Icons.person),
+                      ),
+                      validator: (v) =>
+                          v!.trim().isEmpty ? 'Digite o nome' : null,
+                    ),
+                    const SizedBox(height: 20),
+                    TextFormField(
+                      controller: _email,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'E-mail *',
+                        prefixIcon: Icon(Icons.email),
+                      ),
+                      validator: (v) =>
+                          v!.contains('@') ? null : 'E-mail inválido',
+                    ),
+                    const SizedBox(height: 20),
+                    DropdownButtonFormField<String>(
+                      initialValue: _cargo,
+                      isExpanded: true,
+                      items: cargos
+                          .map(
+                            (c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(formatCargo(c)),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) => setState(() => _cargo = v!),
+                      decoration: const InputDecoration(
+                        labelText: 'Cargo',
+                        prefixIcon: Icon(Icons.work),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SwitchListTile(
+                      dense: true,
+                      activeThumbColor: cs.primary,
+                      title: Text('Status do Usuário'),
+                      subtitle: Text(
+                        _ativo ? 'Ativo (pode logar)' : 'Inativo (bloqueado)',
+                      ),
+                      value: _ativo,
+                      onChanged: (v) => setState(() => _ativo = v),
+                      secondary: _ativo
+                          ? const Icon(Icons.verified_user, color: Colors.green)
+                          : const Icon(Icons.block, color: Colors.red),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ],
                 ),
-                value: _ativo,
-                onChanged: (v) => setState(() => _ativo = v),
               ),
             ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
+            const SizedBox(height: 28),
+            FilledButton.icon(
               icon: const Icon(Icons.send),
               label: Text(isEdit ? 'Salvar Alterações' : 'Enviar Convite'),
               onPressed: () => _salvar(context, isEdit),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade700,
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.primary,
+                foregroundColor: cs.onPrimary,
+                minimumSize: const Size(0, 48),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
             ),
           ],
@@ -131,7 +153,18 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
     );
   }
 
-  static String _formatCargoStatic(String cargo) {
+  static const cargos = [
+    'LIMPEZA',
+    'LAVANDERIA',
+    'MOTORISTA',
+    'SUPERVISOR',
+    'COORDENADOR',
+    'CEO',
+    'DEV',
+    'RH',
+  ];
+
+  static String formatCargo(String cargo) {
     const map = {
       'DEV': 'Desenvolvedor',
       'CEO': 'CEO',
@@ -152,7 +185,6 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
   Future<void> _salvar(BuildContext context, bool isEdit) async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Capture as dependências do context antes dos awaits
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
 
@@ -164,27 +196,21 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
 
       if (!isEdit) {
         final tempPassword = _gerarSenhaTemporaria();
-
-        // App secundária para evitar troca de sessão
         final String appName =
             'invite-${DateTime.now().microsecondsSinceEpoch}';
         final FirebaseApp secondaryApp = await Firebase.initializeApp(
           name: appName,
           options: Firebase.app().options,
         );
-
         try {
           final FirebaseAuth secondaryAuth = FirebaseAuth.instanceFor(
             app: secondaryApp,
           );
-
           final cred = await secondaryAuth.createUserWithEmailAndPassword(
             email: _email.text.trim(),
             password: tempPassword,
           );
-
           final String novoUserId = cred.user!.uid;
-
           await usuariosRef.doc(novoUserId).set({
             'nome': _nome.text.trim(),
             'email': _email.text.trim(),
@@ -193,21 +219,17 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
             'criadoPor': widget.adminEmail,
             'criadoEm': FieldValue.serverTimestamp(),
           });
-
           await secondaryAuth.sendPasswordResetEmail(email: _email.text.trim());
         } finally {
           await secondaryApp.delete();
         }
-
-        if (!context.mounted) return; // guarda o uso do context
-
+        if (!context.mounted) return;
         messenger.showSnackBar(
           SnackBar(
             content: Text('Convite enviado para ${_email.text}!'),
             backgroundColor: Colors.green,
           ),
         );
-
         navigator.pop(true);
       } else {
         await widget.usuario!.reference.update({
@@ -216,11 +238,8 @@ class _UsuarioFormScreenState extends State<UsuarioFormScreen> {
           'cargo': _cargo,
           'ativo': _ativo,
         });
-
         if (!context.mounted) return;
-
         messenger.showSnackBar(const SnackBar(content: Text('Atualizado!')));
-
         navigator.pop(true);
       }
     } on FirebaseAuthException catch (e) {

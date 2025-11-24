@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:propertask/screen/tarefas/tarefa_detalhe_screen.dart';
+import 'package:propertask/screen/tarefas/tarefa_form_screen.dart';
+import 'package:propertask/widgets/app_drawer.dart';
 
 // Widget principal: Tarefas para DEV/COORD/CEO/SUP
 class GestorTarefasScreen extends StatefulWidget {
@@ -31,11 +33,30 @@ class _GestorTarefasScreenState extends State<GestorTarefasScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Tarefas"),
         backgroundColor: cs.primary,
         foregroundColor: cs.onPrimary,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
+      ),
+      drawer: const AppDrawer(currentRoute: '/tarefas'),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TarefaFormScreen()),
+          );
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Nova tarefa'),
       ),
       body: Column(
         children: [
@@ -71,13 +92,12 @@ class _GestorTarefasScreenState extends State<GestorTarefasScreen> {
                         setState(() => _searchQuery = v.toLowerCase()),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Expanded(
-                  flex: 1,
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.calendar_today, size: 18),
-                    label: Text(DateFormat('dd/MM').format(_selectedDate)),
-                    onPressed: () async {
+                  flex: 2,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () async {
                       final picked = await showDatePicker(
                         context: context,
                         initialDate: _selectedDate,
@@ -90,6 +110,19 @@ class _GestorTarefasScreenState extends State<GestorTarefasScreen> {
                         setState(() => _selectedDate = picked);
                       }
                     },
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: 'Data',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: const Icon(Icons.calendar_today),
+                      ),
+                      child: Text(
+                        DateFormat('dd/MM').format(_selectedDate),
+                        style: const TextStyle(fontSize: 17),
+                      ),
+                    ),
                   ),
                 ),
               ],

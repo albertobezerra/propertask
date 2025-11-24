@@ -25,7 +25,6 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
   @override
   void initState() {
     super.initState();
-    // Últimos 7 dias por padrão
     final now = DateTime.now();
     _dateRange = DateTimeRange(
       start: now.subtract(const Duration(days: 7)),
@@ -36,10 +35,8 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
 
   Future<void> _loadRelatorio() async {
     if (_dateRange == null) return;
-
     setState(() => _loading = true);
 
-    // Normaliza: início do dia inicial e início do dia seguinte ao final
     final inicioDia = DateTime(
       _dateRange!.start.year,
       _dateRange!.start.month,
@@ -59,18 +56,15 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
           .collection('propertask')
           .doc('tarefas')
           .collection('tarefas');
-
-      // status == 'concluida' + range em concluidaEm exige índice composto; incluir orderBy ajuda o planejador
       final query = tarefasRef
           .where('status', isEqualTo: 'concluida')
           .where('concluidaEm', isGreaterThanOrEqualTo: inicio)
           .where('concluidaEm', isLessThan: fim)
           .orderBy('concluidaEm');
-
       final snapshot = await query.get();
 
+      if (!mounted) return;
       if (snapshot.docs.isEmpty) {
-        if (!mounted) return;
         setState(() {
           _tarefasConcluidas = [];
           _loading = false;
@@ -78,7 +72,6 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
         return;
       }
 
-      // Coleta ids únicos
       final propIds = snapshot.docs
           .map((d) => (d.data()['propriedadeId'] as String?))
           .whereType<String>()
@@ -88,7 +81,6 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
           .whereType<String>()
           .toSet();
 
-      // Busca paralela
       final propFutures = {
         for (final id in propIds)
           id: FirebaseFirestore.instance
@@ -145,34 +137,25 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
         });
       }
 
-      if (!mounted) return;
       setState(() {
         _tarefasConcluidas = tarefas;
         _loading = false;
       });
     } on FirebaseException catch (e) {
-      if (!mounted) return;
       setState(() => _loading = false);
-      // Índice ausente: instruir criação do índice composto
-      if (e.code == 'failed-precondition') {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Crie o índice: status ASC + concluidaEm ASC em propertask/tarefas/tarefas',
-            ),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao carregar: ${e.message ?? e.code}')),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message ?? e.code),
+          backgroundColor: Colors.red,
+        ),
+      );
     } catch (e) {
-      if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Erro inesperado: $e')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -183,18 +166,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
 
     if (!podeVer) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('Relatórios'),
-          backgroundColor: Colors.blue.shade700,
-          foregroundColor: Colors.white,
-          leading: Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-              tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
-            ),
-          ),
-        ),
+        appBar: _mainAppBar(context, 'Relatórios', '/relatorios'),
         drawer: const AppDrawer(currentRoute: '/relatorios'),
         body: const Center(
           child: Text('Acesso restrito a supervisores e superiores.'),
@@ -209,17 +181,10 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Relatórios'),
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-            tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
-          ),
-        ),
+      appBar: _mainAppBar(
+        context,
+        'Relatórios',
+        '/relatorios',
         actions: [
           IconButton(
             icon: const Icon(Icons.date_range),
@@ -230,7 +195,6 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
                 lastDate: DateTime.now(),
                 initialDateRange: _dateRange,
               );
-              if (!mounted) return;
               if (picked != null) {
                 setState(() => _dateRange = picked);
                 _loadRelatorio();
@@ -245,6 +209,9 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
         children: [
           Card(
             margin: const EdgeInsets.all(12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -256,18 +223,15 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   if (_loading)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: CircularProgressIndicator(),
-                    )
+                    const CircularProgressIndicator()
                   else
                     Text(
                       '${_tarefasConcluidas.length} tarefas concluídas',
                       style: const TextStyle(fontSize: 18),
                     ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   Wrap(
                     spacing: 12,
                     children: porTipo.entries.map((e) {
@@ -297,14 +261,15 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
                       final titulo = (t['titulo'] ?? '').toString();
                       final propriedade = (t['propriedade'] ?? '').toString();
                       final funcionario = (t['funcionario'] ?? '').toString();
-                      final data = (t['data'] is DateTime)
-                          ? t['data'] as DateTime
-                          : DateTime.fromMillisecondsSinceEpoch(0);
+                      final data = t['data'] as DateTime;
 
                       return Card(
                         margin: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 4,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
                         child: ListTile(
                           leading: CircleAvatar(
@@ -332,6 +297,27 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
     );
   }
 
+  AppBar _mainAppBar(
+    BuildContext context,
+    String titulo,
+    String rota, {
+    List<Widget>? actions,
+  }) {
+    return AppBar(
+      title: Text(titulo),
+      backgroundColor: Theme.of(context).colorScheme.primary,
+      foregroundColor: Theme.of(context).colorScheme.onPrimary,
+      leading: Builder(
+        builder: (context) => IconButton(
+          icon: const Icon(Icons.menu),
+          tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+          onPressed: () => Scaffold.of(context).openDrawer(),
+        ),
+      ),
+      actions: actions,
+    );
+  }
+
   Color _getTipoColor(String tipo) {
     switch (tipo.toLowerCase()) {
       case 'limpeza':
@@ -347,13 +333,11 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
 
   Future<void> _exportCSV() async {
     if (_tarefasConcluidas.isEmpty) {
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Nenhum dado para exportar')),
       );
       return;
     }
-
     final headers = [
       'Título',
       'Tipo',
@@ -362,9 +346,7 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
       'Data/Hora',
     ];
     final rows = _tarefasConcluidas.map((t) {
-      final dt = (t['data'] is DateTime)
-          ? t['data'] as DateTime
-          : DateTime.fromMillisecondsSinceEpoch(0);
+      final dt = t['data'] as DateTime;
       return [
         (t['titulo'] ?? '').toString(),
         (t['tipo'] ?? '').toString().toUpperCase(),
@@ -373,7 +355,6 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
         DateFormat('dd/MM/yyyy HH:mm').format(dt),
       ].join(',');
     }).toList();
-
     final csv = [headers.join(','), ...rows].join('\n');
     final bytes = utf8.encode(csv);
 

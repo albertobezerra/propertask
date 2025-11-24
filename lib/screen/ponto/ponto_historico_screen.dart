@@ -20,6 +20,7 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
   Widget build(BuildContext context) {
     final cargo = Provider.of<AppState>(context).usuario?.cargo ?? 'LIMPEZA';
     final podeEditar = Permissions.podeGerenciarUsuarios(cargo);
+    final cs = Theme.of(context).colorScheme;
 
     final inicio = DateTime(
       _selectedDate.year,
@@ -31,13 +32,13 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Histórico de Ponto'),
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        automaticallyImplyLeading: true,
+        backgroundColor: cs.primary,
+        foregroundColor: cs.onPrimary,
         leading: BackButton(onPressed: () => Navigator.of(context).pop()),
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_today),
+            tooltip: "Selecione outro dia",
             onPressed: () async {
               final picked = await showDatePicker(
                 context: context,
@@ -94,8 +95,11 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
                       .toString();
                   return Card(
                     margin: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
+                      horizontal: 16,
+                      vertical: 6,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
                     ),
                     child: ListTile(
                       leading: CircleAvatar(
@@ -114,8 +118,14 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            '${DateFormat('HH:mm').format(horarioReal)} → ${DateFormat('HH:mm').format(horarioArredondado)}',
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2.0, bottom: 2),
+                            child: Chip(
+                              label: Text(
+                                '${DateFormat('HH:mm').format(horarioReal)} → ${DateFormat('HH:mm').format(horarioArredondado)}',
+                              ),
+                              visualDensity: VisualDensity.compact,
+                            ),
                           ),
                           if ((data['observacao'] ?? '').toString().isNotEmpty)
                             Text(

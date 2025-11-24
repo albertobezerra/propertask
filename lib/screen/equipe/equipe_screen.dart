@@ -1,4 +1,3 @@
-// lib/screen/equipe/equipe_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:propertask/screen/equipe/usuario_form_screen.dart';
@@ -9,7 +8,6 @@ import 'package:propertask/core/utils/permissions.dart';
 
 class EquipeScreen extends StatefulWidget {
   const EquipeScreen({super.key});
-
   @override
   State<EquipeScreen> createState() => _EquipeScreenState();
 }
@@ -35,23 +33,20 @@ class _EquipeScreenState extends State<EquipeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Equipe'),
-        centerTitle: true,
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
             onPressed: () => Scaffold.of(context).openDrawer(),
+            tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
           ),
         ),
-        actions: [
-          if (podeEditar)
-            IconButton(
-              icon: const Icon(Icons.add),
+      ),
+      floatingActionButton: podeEditar
+          ? FloatingActionButton.extended(
               onPressed: () async {
-                final navigator = Navigator.of(
-                  context,
-                ); // capture antes do await
+                final navigator = Navigator.of(context);
                 final route = MaterialPageRoute<bool>(
                   builder: (_) => UsuarioFormScreen(
                     adminEmail: emailAtual,
@@ -60,16 +55,17 @@ class _EquipeScreenState extends State<EquipeScreen> {
                 );
                 final result = await navigator.push(route);
                 if (!mounted) return;
-                if (result == true) setState(() {}); // seguro após mounted
+                if (result == true) setState(() {});
               },
-            ),
-        ],
-      ),
+              icon: const Icon(Icons.add),
+              label: const Text('Novo funcionário'),
+            )
+          : null,
       drawer: const AppDrawer(currentRoute: '/equipe'),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: TextField(
               controller: _searchController,
               textCapitalization: TextCapitalization.words,
@@ -79,6 +75,8 @@ class _EquipeScreenState extends State<EquipeScreen> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surface,
               ),
               onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()),
             ),
@@ -118,16 +116,28 @@ class _EquipeScreenState extends State<EquipeScreen> {
 
                     return Card(
                       margin: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: ListTile(
                         leading: CircleAvatar(
                           backgroundColor: ativo ? Colors.green : Colors.red,
-                          child: Text(
-                            nome.isNotEmpty ? nome[0].toUpperCase() : '?',
-                            style: const TextStyle(color: Colors.white),
-                          ),
+                          backgroundImage:
+                              data['fotoUrl'] != null &&
+                                  (data['fotoUrl'] as String).isNotEmpty
+                              ? NetworkImage(data['fotoUrl'])
+                              : null,
+                          child:
+                              (data['fotoUrl'] == null ||
+                                  (data['fotoUrl'] as String).isEmpty)
+                              ? Text(
+                                  nome.isNotEmpty ? nome[0].toUpperCase() : '?',
+                                  style: const TextStyle(color: Colors.white),
+                                )
+                              : null,
                         ),
                         title: Text(
                           nome,
@@ -136,10 +146,27 @@ class _EquipeScreenState extends State<EquipeScreen> {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(email),
                             Text(
-                              _formatCargo(cargo),
-                              style: TextStyle(color: _getCargoColor(cargo)),
+                              email,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2.0),
+                              child: Chip(
+                                label: Text(
+                                  formatCargo(cargo),
+                                  style: TextStyle(
+                                    color: getCargoColor(cargo),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                backgroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest,
+                                visualDensity: VisualDensity.compact,
+                              ),
                             ),
                           ],
                         ),
@@ -147,9 +174,7 @@ class _EquipeScreenState extends State<EquipeScreen> {
                             ? PopupMenuButton<String>(
                                 onSelected: (v) async {
                                   if (v == 'edit') {
-                                    final navigator = Navigator.of(
-                                      context,
-                                    ); // capture antes do await
+                                    final navigator = Navigator.of(context);
                                     final res = await navigator.push<bool>(
                                       MaterialPageRoute(
                                         builder: (_) => UsuarioFormScreen(
@@ -162,11 +187,10 @@ class _EquipeScreenState extends State<EquipeScreen> {
                                     if (!mounted) return;
                                     if (res == true) setState(() {});
                                   } else if (v == 'toggle') {
-                                    // Captura o messenger e não usa Of(context) após await
                                     final messenger = ScaffoldMessenger.of(
                                       context,
                                     );
-                                    await _toggleAtivo(doc, messenger);
+                                    await toggleAtivo(doc, messenger);
                                   }
                                 },
                                 itemBuilder: (_) => const [
@@ -193,7 +217,7 @@ class _EquipeScreenState extends State<EquipeScreen> {
     );
   }
 
-  String _formatCargo(String cargo) {
+  String formatCargo(String cargo) {
     const map = {
       'DEV': 'Desenvolvedor',
       'CEO': 'CEO',
@@ -207,7 +231,7 @@ class _EquipeScreenState extends State<EquipeScreen> {
     return map[cargo] ?? cargo;
   }
 
-  Color _getCargoColor(String cargo) {
+  Color getCargoColor(String cargo) {
     const map = {
       'DEV': Colors.purple,
       'CEO': Colors.red,
@@ -217,8 +241,7 @@ class _EquipeScreenState extends State<EquipeScreen> {
     return map[cargo] ?? Colors.grey;
   }
 
-  // NÃO usa BuildContext após await; recebe o messenger já resolvido
-  Future<void> _toggleAtivo(
+  Future<void> toggleAtivo(
     DocumentSnapshot doc,
     ScaffoldMessengerState messenger,
   ) async {

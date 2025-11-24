@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:propertask/widgets/app_drawer.dart';
 
 class LavanderiaScreen extends StatelessWidget {
   const LavanderiaScreen({super.key});
@@ -16,15 +17,22 @@ class LavanderiaScreen extends StatelessWidget {
       0,
     ); // Amanhã
     final fim = inicio.add(const Duration(days: 1));
-
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Lavanderia'),
-        backgroundColor: Colors.deepPurple, // ou padrão dash
-        centerTitle: true,
+        backgroundColor: cs.primary,
+        foregroundColor: cs.onPrimary,
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+            tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+          ),
+        ),
       ),
+      drawer: const AppDrawer(currentRoute: '/lavanderia'),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('propertask')
@@ -39,7 +47,12 @@ class LavanderiaScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (!tarefasSnap.hasData || tarefasSnap.data!.docs.isEmpty) {
-            return const Center(child: Text('Sem tarefas para amanhã.'));
+            return const Center(
+              child: Text(
+                'Sem tarefas para amanhã.',
+                style: TextStyle(fontSize: 16),
+              ),
+            );
           }
           final tarefas = tarefasSnap.data!.docs;
           final propIds = tarefas
@@ -58,13 +71,11 @@ class LavanderiaScreen extends StatelessWidget {
               if (!propsSnap.hasData) {
                 return const Center(child: CircularProgressIndicator());
               }
-              // propriedades por id
               final props = {
                 for (var doc in propsSnap.data!.docs)
                   doc.id: doc.data() as Map<String, dynamic>,
               };
 
-              // agrupamento por fornecedor
               Map<String, List<Map<String, dynamic>>> porFornecedor = {};
               for (var tarefa in tarefas) {
                 final propId = tarefa['propriedadeId'] as String;
@@ -76,12 +87,12 @@ class LavanderiaScreen extends StatelessWidget {
               }
 
               return ListView(
-                padding: const EdgeInsets.fromLTRB(12, 16, 12, 28),
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
                 children: porFornecedor.entries.map((grupo) {
                   final fornecedor = grupo.key;
                   final propriedades = grupo.value;
 
-                  // Soma quantidades total de roupa deste fornecedor
+                  // Soma quantidade total de roupa por fornecedor
                   final totalRoupas = <String, int>{};
                   for (var prop in propriedades) {
                     final roupa = (prop['roupa'] ?? {}) as Map<String, dynamic>;
@@ -94,23 +105,24 @@ class LavanderiaScreen extends StatelessWidget {
                   return Card(
                     color: cs.surfaceContainerHighest,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(15),
                     ),
                     margin: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 4,
+                      vertical: 11,
+                      horizontal: 2,
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                      padding: const EdgeInsets.fromLTRB(14, 13, 14, 15),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Título agrupado do fornecedor com badge
+                          // Título agrupado do fornecedor e quantidade
                           Row(
                             children: [
                               Icon(
                                 Icons.local_laundry_service,
                                 color: cs.primary,
+                                size: 23,
                               ),
                               const SizedBox(width: 8),
                               Text(
@@ -121,25 +133,24 @@ class LavanderiaScreen extends StatelessWidget {
                                       color: cs.primary,
                                     ),
                               ),
-                              Spacer(),
+                              const Spacer(),
                               Chip(
                                 label: Text(
                                   '${propriedades.length} propriedades',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: cs.onPrimaryContainer,
+                                  ),
                                 ),
                                 backgroundColor: cs.primaryContainer,
-                                labelStyle: TextStyle(
-                                  color: cs.onPrimaryContainer,
-                                  fontWeight: FontWeight.bold,
-                                ),
                                 visualDensity: VisualDensity.compact,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-
-                          // Chips para peças totais
+                          const SizedBox(height: 10),
+                          // Chips das peças totais
                           Wrap(
-                            spacing: 8,
+                            spacing: 10,
                             runSpacing: -8,
                             children: totalRoupas.entries
                                 .where((e) => (e.value) > 0)
@@ -147,37 +158,36 @@ class LavanderiaScreen extends StatelessWidget {
                                   (e) => Chip(
                                     avatar: Icon(
                                       Icons.checkroom,
-                                      size: 15,
+                                      size: 16,
                                       color: cs.secondary,
                                     ),
                                     label: Text(
-                                      '${e.value}x ${_formatNomeItem(e.key, e.value)}',
+                                      '${e.value}x ${formatNomeItem(e.key, e.value)}',
+                                      style: TextStyle(
+                                        color: cs.onSecondaryContainer,
+                                      ),
                                     ),
                                     backgroundColor: cs.secondaryContainer,
-                                    labelStyle: TextStyle(
-                                      color: cs.onSecondaryContainer,
-                                    ),
                                     visualDensity: VisualDensity.compact,
                                   ),
                                 )
                                 .toList(),
                           ),
-                          const SizedBox(height: 10),
-
-                          // Lista das propriedades de cada fornecedor
+                          const SizedBox(height: 13),
+                          // Lista das propriedades daquele fornecedor
                           ...propriedades.map((prop) {
                             final nome = prop['nome'] ?? '';
                             final tipologia = prop['tipologia'] ?? '';
                             return Padding(
-                              padding: const EdgeInsets.only(top: 4),
+                              padding: const EdgeInsets.only(top: 3.5),
                               child: Row(
                                 children: [
                                   Icon(
                                     Icons.apartment,
-                                    size: 15,
+                                    size: 16,
                                     color: cs.primary,
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 9),
                                   Expanded(
                                     child: Text(
                                       '$nome • $tipologia',
@@ -201,7 +211,7 @@ class LavanderiaScreen extends StatelessWidget {
     );
   }
 
-  String _formatNomeItem(String key, int qtd) {
+  String formatNomeItem(String key, int qtd) {
     String nome = key
         .replaceAll('_', ' ')
         .replaceAll('lencol', 'lençol')

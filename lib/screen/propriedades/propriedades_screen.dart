@@ -1,4 +1,3 @@
-// lib/screen/propriedades/propriedades_screen.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:propertask/screen/propriedades/propriedade_detalhe_screen.dart';
@@ -31,12 +30,13 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
   Widget build(BuildContext context) {
     final cargo = Provider.of<AppState>(context).usuario?.cargo ?? 'LIMPEZA';
     final podeEditar = Permissions.podeGerenciarPropriedades(cargo);
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Propriedades'),
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
+        backgroundColor: cs.primary,
+        foregroundColor: cs.onPrimary,
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
@@ -44,26 +44,24 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        actions: [
-          if (podeEditar)
-            IconButton(
-              icon: const Icon(Icons.add),
+      ),
+      floatingActionButton: podeEditar
+          ? FloatingActionButton.extended(
               onPressed: () {
-                final navigator = Navigator.of(context);
-                navigator.push(
+                Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => PropriedadeFormScreen()),
                 );
               },
-              tooltip: 'Nova propriedade',
-            ),
-        ],
-      ),
+              icon: const Icon(Icons.add),
+              label: const Text('Nova propriedade'),
+            )
+          : null,
       drawer: const AppDrawer(currentRoute: '/propriedades'),
       body: Column(
         children: [
-          // BUSCA
+          // Busca
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
@@ -84,12 +82,15 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                filled: true,
+                fillColor: cs.surface,
               ),
               onChanged: (value) =>
                   setState(() => _searchQuery = value.toLowerCase()),
             ),
           ),
-          // LISTA + FILTROS
+
+          // Lista
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
@@ -108,7 +109,6 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                 }
 
                 final allDocs = snapshot.data!.docs;
-
                 // Opções dinâmicas
                 final cidades = <String>{};
                 final tipologias = <String>{};
@@ -119,12 +119,21 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                   if (c.isNotEmpty) cidades.add(c);
                   if (t.isNotEmpty) tipologias.add(t);
                 }
-
                 final cidadesList = ['Todas', ...cidades.toList()..sort()];
                 final tipologiasList = [
                   'Todas',
                   ...tipologias.toList()..sort(),
                 ];
+
+                // Preenche os dropdowns agora que tem os dados
+                // Usa Keys pra forçar rebuild
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  // setState aninhado, só executa se valores mudaram (evita loop)
+                  if (!_dropdownListsIgual(_cidade, cidadesList) ||
+                      !_dropdownListsIgual(_tipologia, tipologiasList)) {
+                    setState(() {});
+                  }
+                });
 
                 // Filtros + busca
                 final filtered = allDocs.where((doc) {
@@ -132,25 +141,24 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                   final nome = (data['nome'] ?? '').toString().toLowerCase();
                   final cidade = (data['cidade'] ?? '').toString();
                   final tipologia = (data['tipologia'] ?? '').toString();
-
                   final matchBusca =
                       _searchQuery.isEmpty || nome.contains(_searchQuery);
                   final matchCidade = _cidade == 'Todas' || cidade == _cidade;
                   final matchTipologia =
                       _tipologia == 'Todas' || tipologia == _tipologia;
-
                   return matchBusca && matchCidade && matchTipologia;
                 }).toList();
 
                 return Column(
                   children: [
-                    // Filtros
+                    // Filtros (real, agora com dados)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
                       child: Row(
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
+                              key: ValueKey(_cidade + cidadesList.join()),
                               initialValue: cidadesList.contains(_cidade)
                                   ? _cidade
                                   : 'Todas',
@@ -176,6 +184,7 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<String>(
+                              key: ValueKey(_tipologia + tipologiasList.join()),
                               initialValue: tipologiasList.contains(_tipologia)
                                   ? _tipologia
                                   : 'Todas',
@@ -202,7 +211,7 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    // Lista
+                    // Lista principal
                     Expanded(
                       child: ListView.builder(
                         itemCount: filtered.length,
@@ -219,8 +228,7 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
 
                           return InkWell(
                             onTap: () {
-                              final navigator = Navigator.of(context);
-                              navigator.push(
+                              Navigator.of(context).push(
                                 MaterialPageRoute(
                                   builder: (_) => PropriedadeDetalheScreen(
                                     propriedadeId: doc.id,
@@ -230,11 +238,11 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                             },
                             child: Card(
                               margin: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
+                                horizontal: 14,
+                                vertical: 7,
                               ),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(13),
                               ),
                               elevation: 2,
                               child: SizedBox(
@@ -244,8 +252,8 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                                     // Thumbnail
                                     ClipRRect(
                                       borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(12),
-                                        bottomLeft: Radius.circular(12),
+                                        topLeft: Radius.circular(13),
+                                        bottomLeft: Radius.circular(13),
                                       ),
                                       child: SizedBox(
                                         width: 120,
@@ -260,10 +268,9 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                                             : _placeholderThumb(),
                                       ),
                                     ),
-                                    // Infos (ajustado para não estourar)
                                     Expanded(
                                       child: Padding(
-                                        padding: const EdgeInsets.all(12),
+                                        padding: const EdgeInsets.all(13),
                                         child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
@@ -289,44 +296,37 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                                               ),
                                             ),
                                             const SizedBox(height: 4),
-                                            Flexible(
-                                              child: Align(
-                                                alignment: Alignment.centerLeft,
-                                                child: Wrap(
-                                                  spacing: 6,
-                                                  runSpacing: -6,
-                                                  children: [
-                                                    if (cidade.isNotEmpty)
-                                                      Chip(
-                                                        label: Text(
-                                                          cidade,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                        ),
-                                                        visualDensity:
-                                                            VisualDensity
-                                                                .compact,
-                                                        materialTapTargetSize:
-                                                            MaterialTapTargetSize
-                                                                .shrinkWrap,
-                                                      ),
-                                                    if (tipologia.isNotEmpty)
-                                                      Chip(
-                                                        label: Text(
-                                                          tipologia,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                        ),
-                                                        visualDensity:
-                                                            VisualDensity
-                                                                .compact,
-                                                        materialTapTargetSize:
-                                                            MaterialTapTargetSize
-                                                                .shrinkWrap,
-                                                      ),
-                                                  ],
-                                                ),
-                                              ),
+                                            Wrap(
+                                              spacing: 7,
+                                              runSpacing: -6,
+                                              children: [
+                                                if (cidade.isNotEmpty)
+                                                  Chip(
+                                                    label: Text(
+                                                      cidade,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                    visualDensity:
+                                                        VisualDensity.compact,
+                                                    materialTapTargetSize:
+                                                        MaterialTapTargetSize
+                                                            .shrinkWrap,
+                                                  ),
+                                                if (tipologia.isNotEmpty)
+                                                  Chip(
+                                                    label: Text(
+                                                      tipologia,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                    visualDensity:
+                                                        VisualDensity.compact,
+                                                    materialTapTargetSize:
+                                                        MaterialTapTargetSize
+                                                            .shrinkWrap,
+                                                  ),
+                                              ],
                                             ),
                                           ],
                                         ),
@@ -358,5 +358,11 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
         child: Icon(Icons.home, color: Colors.blueGrey, size: 40),
       ),
     );
+  }
+
+  // Para garantir que as listas de dropdown (filtros) mudaram
+  bool _dropdownListsIgual(String selected, List<String> list) {
+    // Use para controlar keys etc, não precisa forçar updates
+    return list.contains(selected);
   }
 }

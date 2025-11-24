@@ -1,4 +1,3 @@
-// lib/screen/ponto/ponto_screen.dart
 import 'package:flutter/material.dart';
 import 'package:propertask/screen/ponto/ponto_historico_screen.dart';
 import 'package:provider/provider.dart';
@@ -169,12 +168,13 @@ class _PontoScreenState extends State<PontoScreen> {
     final cargo = Provider.of<AppState>(context).usuario?.cargo ?? 'LIMPEZA';
     final podeBater = ['LIMPEZA', 'LAVANDERIA', 'MOTORISTA'].contains(cargo);
     final podeVerHistorico = Permissions.podeGerenciarUsuarios(cargo);
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ponto'),
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
+        backgroundColor: cs.primary,
+        foregroundColor: cs.onPrimary,
         leading: Builder(
           builder: (context) => IconButton(
             icon: const Icon(Icons.menu),
@@ -187,8 +187,7 @@ class _PontoScreenState extends State<PontoScreen> {
             IconButton(
               icon: const Icon(Icons.history),
               onPressed: () {
-                final navigator = Navigator.of(context);
-                navigator.push(
+                Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) => const PontoHistoricoScreen(),
                   ),
@@ -200,63 +199,96 @@ class _PontoScreenState extends State<PontoScreen> {
       drawer: const AppDrawer(currentRoute: '/ponto'),
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.access_time,
-                size: 100,
-                color: podeBater ? Colors.blue : Colors.grey,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                _status,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 32),
-              if (podeBater) ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: _ultimoPonto == 'entrada'
-                          ? null
-                          : () => _baterPonto('entrada'),
-                      icon: const Icon(Icons.login),
-                      label: const Text('ENTRADA'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
-                        ),
-                      ),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+          child: Card(
+            color: cs.surfaceContainerHighest,
+            elevation: 5,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.access_time,
+                    size: 80,
+                    color: podeBater ? cs.primary : cs.outline,
+                  ),
+                  const SizedBox(height: 15),
+                  Text(
+                    "Registro de Ponto",
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: cs.primary,
                     ),
-                    const SizedBox(width: 16),
-                    ElevatedButton.icon(
-                      onPressed: _ultimoPonto == 'saida'
-                          ? null
-                          : () => _baterPonto('saida'),
-                      icon: const Icon(Icons.logout),
-                      label: const Text('SAÍDA'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
+                  ),
+                  const Divider(height: 28, thickness: 1.2),
+                  Text(
+                    _status,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: cs.onSurface,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  if (podeBater) ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: _ultimoPonto == 'entrada'
+                              ? null
+                              : () => _baterPonto('entrada'),
+                          icon: const Icon(Icons.login),
+                          label: const Text('ENTRADA'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 23,
+                              vertical: 15,
+                            ),
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 22),
+                        ElevatedButton.icon(
+                          onPressed: _ultimoPonto == 'saida'
+                              ? null
+                              : () => _baterPonto('saida'),
+                          icon: const Icon(Icons.logout),
+                          label: const Text('SAÍDA'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 23,
+                              vertical: 15,
+                            ),
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    Text(
+                      'Você não precisa bater ponto.',
+                      style: TextStyle(color: cs.outline),
                     ),
                   ],
-                ),
-              ] else
-                const Text('Você não precisa bater ponto.'),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
       ),

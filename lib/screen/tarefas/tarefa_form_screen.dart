@@ -212,7 +212,10 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
 
             ElevatedButton(
               onPressed: _onSalvarPressed,
-              child: Text(widget.tarefa == null ? 'Criar tarefa' : 'Salvar'),
+              child: Text(
+                widget.tarefa == null ? 'Criar tarefa' : 'Salvar',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         ),

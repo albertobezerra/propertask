@@ -66,6 +66,7 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Consumer<AppState>(
       builder: (context, appState, child) {
         final usuario = appState.usuario;
@@ -78,14 +79,14 @@ class ProfileScreen extends StatelessWidget {
         final avatarUrl = usuario.fotoUrl ?? '';
 
         return Scaffold(
-          backgroundColor: const Color(0xFF1A5B53),
+          backgroundColor: cs.primary, // branding principal do app
           drawer: AppDrawer(currentRoute: '/perfil'),
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
             leading: Builder(
               builder: (context) => IconButton(
-                icon: Icon(Icons.menu, color: Colors.white),
+                icon: const Icon(Icons.menu, color: Colors.white),
                 onPressed: () => Scaffold.of(context).openDrawer(),
                 tooltip: "Abrir menu",
               ),
@@ -101,39 +102,27 @@ class ProfileScreen extends StatelessWidget {
           ),
           body: Stack(
             children: [
-              Positioned(
-                top: -120,
-                left: -80,
-                child: Container(
-                  width: 260,
-                  height: 260,
-                  decoration: BoxDecoration(
-                    color: Color(0xFF3AB09C),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
               SafeArea(
                 child: SingleChildScrollView(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20.0),
                     child: Column(
                       children: [
-                        const SizedBox(height: 80),
+                        const SizedBox(height: 70),
                         Stack(
                           clipBehavior: Clip.none,
                           children: [
                             Container(
                               width: double.infinity,
                               padding: const EdgeInsets.only(
-                                top: 64,
-                                bottom: 22,
+                                top: 68,
+                                bottom: 24,
                                 left: 20,
                                 right: 20,
                               ),
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(28),
+                                borderRadius: BorderRadius.circular(30),
                               ),
                               child: Column(
                                 children: [
@@ -141,7 +130,7 @@ class ProfileScreen extends StatelessWidget {
                                     usuario.nome,
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF133E35),
+                                      color: cs.primary,
                                       fontSize: 22,
                                     ),
                                   ),
@@ -149,7 +138,7 @@ class ProfileScreen extends StatelessWidget {
                                     Text(
                                       usuario.telefone ?? '',
                                       style: TextStyle(
-                                        color: Color(0xFF5A9E8B),
+                                        color: cs.secondary,
                                         fontSize: 14,
                                       ),
                                     ),
@@ -157,7 +146,7 @@ class ProfileScreen extends StatelessWidget {
                                     Text(
                                       usuario.cargo,
                                       style: TextStyle(
-                                        color: Color(0xFF45C3B7),
+                                        color: cs.secondary,
                                         fontSize: 14,
                                       ),
                                     ),
@@ -171,17 +160,20 @@ class ProfileScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
-
                             Positioned(
-                              top: -66,
+                              top: -65,
                               left: 0,
                               right: 0,
                               child: Center(
                                 child: Stack(
                                   children: [
-                                    SizedBox(
+                                    Container(
                                       width: 120,
                                       height: 120,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(32),
+                                        color: cs.secondary,
+                                      ),
                                       child: ClipRRect(
                                         borderRadius: BorderRadius.circular(32),
                                         child: avatarUrl.isNotEmpty
@@ -189,33 +181,32 @@ class ProfileScreen extends StatelessWidget {
                                                 imageUrl: avatarUrl,
                                                 placeholder: (ctx, url) =>
                                                     Container(
-                                                      color: Color(0xFF3AB09C),
+                                                      color: cs.secondary,
                                                       child: Icon(
                                                         Icons.person,
-                                                        size: 46,
-                                                        color: Colors.white,
+                                                        size: 45,
+                                                        color: cs.onSecondary,
                                                       ),
                                                     ),
                                                 errorWidget:
                                                     (ctx, url, error) =>
                                                         Container(
-                                                          color: Color(
-                                                            0xFF3AB09C,
-                                                          ),
+                                                          color: cs.secondary,
                                                           child: Icon(
                                                             Icons.person,
-                                                            size: 46,
-                                                            color: Colors.white,
+                                                            size: 45,
+                                                            color:
+                                                                cs.onSecondary,
                                                           ),
                                                         ),
                                                 fit: BoxFit.cover,
                                               )
                                             : Container(
-                                                color: Color(0xFF3AB09C),
+                                                color: cs.secondary,
                                                 child: Icon(
                                                   Icons.person,
-                                                  size: 46,
-                                                  color: Colors.white,
+                                                  size: 45,
+                                                  color: cs.onSecondary,
                                                 ),
                                               ),
                                       ),
@@ -230,14 +221,18 @@ class ProfileScreen extends StatelessWidget {
                                           usuario.fotoUrl,
                                         ),
                                         child: Container(
-                                          decoration: const BoxDecoration(
+                                          decoration: BoxDecoration(
                                             shape: BoxShape.circle,
-                                            color: Colors.white,
+                                            color: cs.primary,
+                                            border: Border.all(
+                                              color: Colors.white,
+                                              width: 2,
+                                            ),
                                           ),
-                                          padding: const EdgeInsets.all(6),
-                                          child: const Icon(
+                                          padding: const EdgeInsets.all(5),
+                                          child: Icon(
                                             Icons.camera_alt,
-                                            color: Color(0xFF3AB09C),
+                                            color: Colors.white,
                                             size: 22,
                                           ),
                                         ),
@@ -254,27 +249,43 @@ class ProfileScreen extends StatelessWidget {
                           icon: Icons.language,
                           label: "Idioma",
                           trailing: "Português",
+                          color: cs.surfaceContainerHighest,
+                          iconColor: cs.primary,
                         ),
-                        cardOpcao(icon: Icons.lock, label: "Alterar senha"),
+                        cardOpcao(
+                          icon: Icons.lock,
+                          label: "Alterar senha",
+                          color: cs.surfaceContainerHighest,
+                          iconColor: cs.primary,
+                        ),
                         cardOpcao(
                           icon: Icons.privacy_tip_outlined,
                           label: "Privacidade",
+                          color: cs.surfaceContainerHighest,
+                          iconColor: cs.primary,
                         ),
                         cardOpcao(
                           icon: Icons.description_outlined,
                           label: "Termos de uso",
+                          color: cs.surfaceContainerHighest,
+                          iconColor: cs.primary,
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 30),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF3AB09C),
-                              padding: EdgeInsets.symmetric(vertical: 15),
+                              backgroundColor: cs.secondary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 15),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(24),
                               ),
                               elevation: 0,
+                              textStyle: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 17,
+                              ),
                             ),
                             onPressed: () async {
                               Navigator.pop(context);
@@ -282,15 +293,8 @@ class ProfileScreen extends StatelessWidget {
                                 context,
                               ).popUntil((route) => route.isFirst);
                               await AuthService.logout(context);
-                            }, // Deslogar
-                            child: Text(
-                              "Sair",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 17,
-                              ),
-                            ),
+                            },
+                            child: const Text("Sair"),
                           ),
                         ),
                         const SizedBox(height: 36),
@@ -310,23 +314,26 @@ class ProfileScreen extends StatelessWidget {
     required IconData icon,
     required String label,
     String? trailing,
+    Color? color,
+    Color? iconColor,
   }) {
     return Container(
-      margin: EdgeInsets.only(bottom: 14),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(16),
       ),
       child: ListTile(
-        leading: Icon(icon, color: Color(0xFF3AB09C), size: 26),
-        title: Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
+        leading: Icon(
+          icon,
+          color: iconColor ?? const Color(0xFF3AB09C),
+          size: 26,
+        ),
+        title: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
         trailing: trailing != null
             ? Text(
                 trailing,
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF3AB09C),
-                ),
+                style: const TextStyle(fontWeight: FontWeight.w500),
               )
             : null,
         dense: true,
