@@ -89,8 +89,7 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                   setState(() => _searchQuery = value.toLowerCase()),
             ),
           ),
-
-          // Lista
+          // StreamBuilder com ListView
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
@@ -125,16 +124,6 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                   ...tipologias.toList()..sort(),
                 ];
 
-                // Preenche os dropdowns agora que tem os dados
-                // Usa Keys pra forçar rebuild
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  // setState aninhado, só executa se valores mudaram (evita loop)
-                  if (!_dropdownListsIgual(_cidade, cidadesList) ||
-                      !_dropdownListsIgual(_tipologia, tipologiasList)) {
-                    setState(() {});
-                  }
-                });
-
                 // Filtros + busca
                 final filtered = allDocs.where((doc) {
                   final data = doc.data() as Map<String, dynamic>;
@@ -149,9 +138,10 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                   return matchBusca && matchCidade && matchTipologia;
                 }).toList();
 
-                return Column(
+                return ListView(
+                  padding: EdgeInsets.zero,
                   children: [
-                    // Filtros (real, agora com dados)
+                    // Filtros
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
                       child: Row(
@@ -212,135 +202,127 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                     ),
                     const SizedBox(height: 4),
                     // Lista principal
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: filtered.length,
-                        itemBuilder: (context, index) {
-                          final doc = filtered[index];
-                          final data = doc.data() as Map<String, dynamic>;
-                          final nome = (data['nome'] ?? 'Sem nome').toString();
-                          final endereco = (data['endereco'] ?? 'Sem endereço')
-                              .toString();
-                          final cidade = (data['cidade'] ?? '').toString();
-                          final tipologia = (data['tipologia'] ?? '')
-                              .toString();
-                          final fotoUrl = (data['fotoUrl'] ?? '').toString();
+                    ...filtered.map((doc) {
+                      final data = doc.data() as Map<String, dynamic>;
+                      final nome = (data['nome'] ?? 'Sem nome').toString();
+                      final endereco = (data['endereco'] ?? 'Sem endereço')
+                          .toString();
+                      final cidade = (data['cidade'] ?? '').toString();
+                      final tipologia = (data['tipologia'] ?? '').toString();
+                      final fotoUrl = (data['fotoUrl'] ?? '').toString();
 
-                          return InkWell(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => PropriedadeDetalheScreen(
-                                    propriedadeId: doc.id,
-                                  ),
-                                ),
-                              );
-                            },
-                            child: Card(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 7,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(13),
-                              ),
-                              elevation: 2,
-                              child: SizedBox(
-                                height: 110, // altura fixa
-                                child: Row(
-                                  children: [
-                                    // Thumbnail
-                                    ClipRRect(
-                                      borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(13),
-                                        bottomLeft: Radius.circular(13),
-                                      ),
-                                      child: SizedBox(
-                                        width: 120,
-                                        height: double.infinity,
-                                        child: fotoUrl.isNotEmpty
-                                            ? Image.network(
-                                                fotoUrl,
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, _, _) =>
-                                                    _placeholderThumb(),
-                                              )
-                                            : _placeholderThumb(),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(13),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              nome,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 16,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              endereco,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: Colors.black54,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Wrap(
-                                              spacing: 7,
-                                              runSpacing: -6,
-                                              children: [
-                                                if (cidade.isNotEmpty)
-                                                  Chip(
-                                                    label: Text(
-                                                      cidade,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                    visualDensity:
-                                                        VisualDensity.compact,
-                                                    materialTapTargetSize:
-                                                        MaterialTapTargetSize
-                                                            .shrinkWrap,
-                                                  ),
-                                                if (tipologia.isNotEmpty)
-                                                  Chip(
-                                                    label: Text(
-                                                      tipologia,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                    visualDensity:
-                                                        VisualDensity.compact,
-                                                    materialTapTargetSize:
-                                                        MaterialTapTargetSize
-                                                            .shrinkWrap,
-                                                  ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                  ],
-                                ),
+                      return InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => PropriedadeDetalheScreen(
+                                propriedadeId: doc.id,
                               ),
                             ),
                           );
                         },
-                      ),
-                    ),
+                        child: Card(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 7,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          elevation: 2,
+                          child: IntrinsicHeight(
+                            child: Row(
+                              children: [
+                                // Thumbnail
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.only(
+                                    topLeft: Radius.circular(13),
+                                    bottomLeft: Radius.circular(13),
+                                  ),
+                                  child: SizedBox(
+                                    width: 120,
+                                    height: double.infinity,
+                                    child: fotoUrl.isNotEmpty
+                                        ? Image.network(
+                                            fotoUrl,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, _, _) =>
+                                                _placeholderThumb(),
+                                          )
+                                        : _placeholderThumb(),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(13),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          nome,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          endereco,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Colors.black54,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Wrap(
+                                          spacing: 7,
+                                          runSpacing: -6,
+                                          children: [
+                                            if (cidade.isNotEmpty)
+                                              Chip(
+                                                label: Text(
+                                                  cidade,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                materialTapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                              ),
+                                            if (tipologia.isNotEmpty)
+                                              Chip(
+                                                label: Text(
+                                                  tipologia,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                materialTapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                              ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }),
                   ],
                 );
               },
@@ -358,11 +340,5 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
         child: Icon(Icons.home, color: Colors.blueGrey, size: 40),
       ),
     );
-  }
-
-  // Para garantir que as listas de dropdown (filtros) mudaram
-  bool _dropdownListsIgual(String selected, List<String> list) {
-    // Use para controlar keys etc, não precisa forçar updates
-    return list.contains(selected);
   }
 }
