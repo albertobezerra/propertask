@@ -61,15 +61,16 @@ class _PontoScreenState extends State<PontoScreen> {
   }
 
   Future<void> _carregarUltimoPonto() async {
+    final empresaId = Provider.of<AppState>(context, listen: false).empresaId!;
     final userId = Provider.of<AppState>(context, listen: false).user!.uid;
     final hoje = DateTime.now();
     final inicio = DateTime(hoje.year, hoje.month, hoje.day);
     final fim = inicio.add(const Duration(days: 1));
 
     final snapshot = await FirebaseFirestore.instance
-        .collection('propertask')
-        .doc('ponto')
-        .collection('registros')
+        .collection('empresas')
+        .doc(empresaId)
+        .collection('pontoRegistros')
         .where('usuarioId', isEqualTo: userId)
         .where(
           'horarioReal',
@@ -106,14 +107,15 @@ class _PontoScreenState extends State<PontoScreen> {
 
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final userId = Provider.of<AppState>(context, listen: false).user!.uid;
+    final empresaId = Provider.of<AppState>(context, listen: false).empresaId!;
     final agora = DateTime.now();
     final arredondado = _arredondarHora(agora);
 
     try {
       await FirebaseFirestore.instance
-          .collection('propertask')
-          .doc('ponto')
-          .collection('registros')
+          .collection('empresas')
+          .doc(empresaId)
+          .collection('pontoRegistros')
           .add({
             'usuarioId': userId,
             'tipo': tipo,

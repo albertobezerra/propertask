@@ -22,6 +22,7 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
     final podeEditar = Permissions.podeGerenciarUsuarios(cargo);
     final cs = Theme.of(context).colorScheme;
 
+    final empresaId = Provider.of<AppState>(context, listen: false).empresaId!;
     final inicio = DateTime(
       _selectedDate.year,
       _selectedDate.month,
@@ -54,9 +55,9 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
       drawer: const AppDrawer(currentRoute: '/ponto/historico'),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('propertask')
-            .doc('ponto')
-            .collection('registros')
+            .collection('empresas')
+            .doc(empresaId)
+            .collection('pontoRegistros')
             .where(
               'horarioReal',
               isGreaterThanOrEqualTo: Timestamp.fromDate(inicio),
@@ -84,9 +85,10 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
               final usuarioId = (data['usuarioId'] ?? '') as String;
 
               return FutureBuilder<DocumentSnapshot>(
+                // Se você também migrou usuários para multiempresa, troque o caminho aqui também!
                 future: FirebaseFirestore.instance
-                    .collection('propertask')
-                    .doc('usuarios')
+                    .collection('empresas')
+                    .doc(empresaId)
                     .collection('usuarios')
                     .doc(usuarioId)
                     .get(),
@@ -143,7 +145,7 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
                                   _editarObservacao(context, doc);
                                 }
                                 if (v == 'delete') {
-                                  _excluirPonto(context, doc.id);
+                                  _excluirPonto(context, doc.id, empresaId);
                                 }
                               },
                               itemBuilder: (_) => const [
@@ -217,7 +219,7 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
     );
   }
 
-  void _excluirPonto(BuildContext context, String id) {
+  void _excluirPonto(BuildContext context, String id, String empresaId) {
     final navigator = Navigator.of(context);
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
@@ -235,9 +237,9 @@ class _PontoHistoricoScreenState extends State<PontoHistoricoScreen> {
             onPressed: () async {
               try {
                 await FirebaseFirestore.instance
-                    .collection('propertask')
-                    .doc('ponto')
-                    .collection('registros')
+                    .collection('empresas')
+                    .doc(empresaId)
+                    .collection('pontoRegistros')
                     .doc(id)
                     .delete();
                 if (!mounted) return;
