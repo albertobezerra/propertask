@@ -140,15 +140,19 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
 
                 return ListView(
                   padding: EdgeInsets.zero,
+
                   children: [
                     // Filtros
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-                      child: Row(
+
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
+                          // Cidade
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              key: ValueKey(_cidade + cidadesList.join()),
                               initialValue: cidadesList.contains(_cidade)
                                   ? _cidade
                                   : 'Todas',
@@ -156,7 +160,11 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                                   .map(
                                     (c) => DropdownMenuItem(
                                       value: c,
-                                      child: Text(c),
+                                      child: Text(
+                                        c,
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                      ),
                                     ),
                                   )
                                   .toList(),
@@ -168,13 +176,18 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 12,
+                                ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 8),
+                          // Tipologia
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              key: ValueKey(_tipologia + tipologiasList.join()),
                               initialValue: tipologiasList.contains(_tipologia)
                                   ? _tipologia
                                   : 'Todas',
@@ -182,7 +195,11 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                                   .map(
                                     (t) => DropdownMenuItem(
                                       value: t,
-                                      child: Text(t),
+                                      child: Text(
+                                        t,
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                      ),
                                     ),
                                   )
                                   .toList(),
@@ -194,12 +211,18 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 12,
+                                ),
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
+
                     const SizedBox(height: 4),
                     // Lista principal
                     ...filtered.map((doc) {

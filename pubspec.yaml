@@ -52,6 +52,7 @@ dependencies:
   multi_image_picker_view: ^3.0.0
   location: ^8.0.1
   geocoding: ^4.0.0
+  timer_builder: ^2.0.0
 
 dev_dependencies:
   flutter_test:
