@@ -163,10 +163,14 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
       await ref.putFile(file);
       final url = await ref.getDownloadURL();
       novasFotos.add(url);
+
+      // REMOVA do localTaskPhotos só quando UPLOAD e update Firestore finalizar!
       setState(() {
         localTaskPhotos.removeWhere((f) => f.path == img.path);
       });
     }
+
+    // Atualizar lista no Firestore
     final updatedList = [...(data['fotos'] ?? []), ...novasFotos];
     await FirebaseFirestore.instance
         .collection('propertask')
@@ -174,9 +178,9 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
         .collection('tarefas')
         .doc(widget.tarefaId)
         .update({'fotos': updatedList});
-    setState(() {
-      taskPhotos.addAll(novasFotos);
-    });
+
+    // NÃO adicione manualmente as novas fotos na lista `taskPhotos` aqui!
+    // Espere os snapshots do Firestore atualizarem.
   }
 
   Future<void> _adicionarImagemCamera() async {
@@ -239,44 +243,98 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
 
   // Método para mostrar galeria
   void _mostrarGaleriaFotos(BuildContext context, int indexInicial) {
+    final pageController = PageController(initialPage: indexInicial);
     showDialog(
       context: context,
-      builder: (_) => Dialog(
-        insetPadding: const EdgeInsets.all(12),
-        backgroundColor: Colors.black87,
-        child: SizedBox(
-          width: double.infinity,
-          height: 420, // ajuste conforme necessário
-          child: Stack(
-            children: [
-              PhotoViewGallery.builder(
-                itemCount: taskPhotos.length,
-                pageController: PageController(initialPage: indexInicial),
-                builder: (context, index) {
-                  final url = taskPhotos[index];
-                  return PhotoViewGalleryPageOptions(
-                    imageProvider: NetworkImage(url),
-                    minScale: PhotoViewComputedScale.contained,
-                    maxScale: PhotoViewComputedScale.covered * 2,
-                  );
-                },
-                backgroundDecoration: const BoxDecoration(
-                  color: Colors.black87,
-                ),
+      barrierColor: Colors.black.withOpacity(0.8), // overlay bonito!
+      builder: (ctx) {
+        int atual = indexInicial;
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Scaffold(
+              backgroundColor: Colors.transparent,
+              body: Stack(
+                children: [
+                  Center(
+                    child: Container(
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.98,
+                        maxHeight: MediaQuery.of(context).size.height * 0.85,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black38,
+                            blurRadius: 22,
+                            offset: Offset(0, 10),
+                            spreadRadius: -8,
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: PhotoViewGallery.builder(
+                          itemCount: taskPhotos.length,
+                          pageController: pageController,
+                          onPageChanged: (index) {
+                            setModalState(() => atual = index);
+                          },
+                          builder: (context, index) {
+                            return PhotoViewGalleryPageOptions(
+                              imageProvider: NetworkImage(taskPhotos[index]),
+                              minScale: PhotoViewComputedScale.contained,
+                              maxScale: PhotoViewComputedScale.covered,
+                              heroAttributes: PhotoViewHeroAttributes(
+                                tag: taskPhotos[index],
+                              ),
+                            );
+                          },
+                          backgroundDecoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Dots
+                  Positioned(
+                    bottom: 52,
+                    left: 0,
+                    right: 0,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(taskPhotos.length, (i) {
+                        return AnimatedContainer(
+                          duration: Duration(milliseconds: 180),
+                          margin: EdgeInsets.symmetric(horizontal: 4),
+                          width: atual == i ? 14 : 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: atual == i ? Colors.white : Colors.white30,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                  // Fechar
+                  Positioned(
+                    top: 32,
+                    right: 34,
+                    child: IconButton(
+                      icon: Icon(Icons.close, color: Colors.white70, size: 32),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                  // Swipe hint lateral (opcional, só se quiser)
+                  // Exemplo de sombra/flecha na lateral esquerda/direita
+                ],
               ),
-              // Ícone de fechar (X)
-              Positioned(
-                top: 16,
-                right: 16,
-                child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
