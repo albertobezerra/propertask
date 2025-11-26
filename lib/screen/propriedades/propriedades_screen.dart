@@ -59,7 +59,7 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
       drawer: const AppDrawer(currentRoute: '/propriedades'),
       body: Column(
         children: [
-          // Busca
+          // Busca por nome — FIXA
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: TextField(
@@ -89,7 +89,129 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                   setState(() => _searchQuery = value.toLowerCase()),
             ),
           ),
-          // StreamBuilder com ListView
+          // Filtros — FIXOS
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
+            child: Row(
+              children: [
+                Flexible(
+                  flex: 1,
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('propertask')
+                        .doc('propriedades')
+                        .collection('propriedades')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      // Previne null ao iniciar app
+                      final allDocs = snapshot.hasData
+                          ? snapshot.data!.docs
+                          : <QueryDocumentSnapshot>[];
+                      final cidades = <String>{};
+                      for (final d in allDocs) {
+                        final data = d.data() as Map<String, dynamic>;
+                        final c = (data['cidade'] ?? '').toString().trim();
+                        if (c.isNotEmpty) cidades.add(c);
+                      }
+                      final cidadesList = [
+                        'Todas',
+                        ...cidades.toList()..sort(),
+                      ];
+                      return DropdownButtonFormField<String>(
+                        initialValue: cidadesList.contains(_cidade)
+                            ? _cidade
+                            : 'Todas',
+                        items: cidadesList
+                            .map(
+                              (c) => DropdownMenuItem(
+                                value: c,
+                                child: Text(
+                                  c,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _cidade = v ?? 'Todas'),
+                        decoration: InputDecoration(
+                          labelText: 'Cidade',
+                          prefixIcon: const Icon(Icons.location_city),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 12,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  flex: 1,
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('propertask')
+                        .doc('propriedades')
+                        .collection('propriedades')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      final allDocs = snapshot.hasData
+                          ? snapshot.data!.docs
+                          : <QueryDocumentSnapshot>[];
+                      final tipologias = <String>{};
+                      for (final d in allDocs) {
+                        final data = d.data() as Map<String, dynamic>;
+                        final t = (data['tipologia'] ?? '').toString().trim();
+                        if (t.isNotEmpty) tipologias.add(t);
+                      }
+                      final tipologiasList = [
+                        'Todas',
+                        ...tipologias.toList()..sort(),
+                      ];
+                      return DropdownButtonFormField<String>(
+                        initialValue: tipologiasList.contains(_tipologia)
+                            ? _tipologia
+                            : 'Todas',
+                        items: tipologiasList
+                            .map(
+                              (t) => DropdownMenuItem(
+                                value: t,
+                                child: Text(
+                                  t,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _tipologia = v ?? 'Todas'),
+                        decoration: InputDecoration(
+                          labelText: 'Tipologia',
+                          prefixIcon: const Icon(Icons.category),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 12,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Lista de propriedades (apenas isso desliza)
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
@@ -108,21 +230,7 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                 }
 
                 final allDocs = snapshot.data!.docs;
-                // Opções dinâmicas
-                final cidades = <String>{};
-                final tipologias = <String>{};
-                for (final d in allDocs) {
-                  final data = d.data() as Map<String, dynamic>;
-                  final c = (data['cidade'] ?? '').toString().trim();
-                  final t = (data['tipologia'] ?? '').toString().trim();
-                  if (c.isNotEmpty) cidades.add(c);
-                  if (t.isNotEmpty) tipologias.add(t);
-                }
-                final cidadesList = ['Todas', ...cidades.toList()..sort()];
-                final tipologiasList = [
-                  'Todas',
-                  ...tipologias.toList()..sort(),
-                ];
+                // Opções dinâmicas já estão contempladas nos filtros acima
 
                 // Filtros + busca
                 final filtered = allDocs.where((doc) {
@@ -140,91 +248,8 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
 
                 return ListView(
                   padding: EdgeInsets.zero,
-
                   children: [
-                    // Filtros
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        children: [
-                          // Cidade
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: cidadesList.contains(_cidade)
-                                  ? _cidade
-                                  : 'Todas',
-                              items: cidadesList
-                                  .map(
-                                    (c) => DropdownMenuItem(
-                                      value: c,
-                                      child: Text(
-                                        c,
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (v) =>
-                                  setState(() => _cidade = v ?? 'Todas'),
-                              decoration: InputDecoration(
-                                labelText: 'Cidade',
-                                prefixIcon: const Icon(Icons.location_city),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                  horizontal: 12,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          // Tipologia
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              initialValue: tipologiasList.contains(_tipologia)
-                                  ? _tipologia
-                                  : 'Todas',
-                              items: tipologiasList
-                                  .map(
-                                    (t) => DropdownMenuItem(
-                                      value: t,
-                                      child: Text(
-                                        t,
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 1,
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (v) =>
-                                  setState(() => _tipologia = v ?? 'Todas'),
-                              decoration: InputDecoration(
-                                labelText: 'Tipologia',
-                                prefixIcon: const Icon(Icons.category),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                  horizontal: 12,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
                     const SizedBox(height: 4),
-                    // Lista principal
                     ...filtered.map((doc) {
                       final data = doc.data() as Map<String, dynamic>;
                       final nome = (data['nome'] ?? 'Sem nome').toString();
