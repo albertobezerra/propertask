@@ -17,9 +17,10 @@ class PropriedadeDetalheScreen extends StatelessWidget {
     final cargo = Provider.of<AppState>(context).usuario?.cargo ?? 'LIMPEZA';
     final podeEditar = Permissions.podeGerenciarPropriedades(cargo);
 
+    final empresaId = Provider.of<AppState>(context, listen: false).empresaId!;
     final docRef = FirebaseFirestore.instance
-        .collection('propertask')
-        .doc('propriedades')
+        .collection('empresas')
+        .doc(empresaId)
         .collection('propriedades')
         .doc(propriedadeId);
 

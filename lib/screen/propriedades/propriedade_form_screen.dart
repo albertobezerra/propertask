@@ -2,6 +2,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:propertask/core/providers/app_state.dart';
+import 'package:provider/provider.dart';
 
 class PropriedadeFormScreen extends StatefulWidget {
   final DocumentSnapshot? propriedade;
@@ -752,14 +754,18 @@ class _PropriedadeFormScreenState extends State<PropriedadeFormScreen> {
     };
 
     try {
+      final empresaId = Provider.of<AppState>(
+        context,
+        listen: false,
+      ).empresaId!;
+      final propriedadesRef = FirebaseFirestore.instance
+          .collection('empresas')
+          .doc(empresaId)
+          .collection('propriedades');
       if (widget.propriedade == null) {
-        await FirebaseFirestore.instance
-            .collection('propertask')
-            .doc('propriedades')
-            .collection('propriedades')
-            .add(data);
+        await propriedadesRef.add(data);
       } else {
-        await widget.propriedade!.reference.update(data);
+        await propriedadesRef.doc(widget.propriedade!.id).update(data);
       }
       if (!mounted) return;
       navigator.pop();

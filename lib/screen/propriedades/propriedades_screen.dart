@@ -28,9 +28,15 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final empresaId = Provider.of<AppState>(context).empresaId!;
     final cargo = Provider.of<AppState>(context).usuario?.cargo ?? 'LIMPEZA';
     final podeEditar = Permissions.podeGerenciarPropriedades(cargo);
     final cs = Theme.of(context).colorScheme;
+
+    final propriedadesRef = FirebaseFirestore.instance
+        .collection('empresas')
+        .doc(empresaId)
+        .collection('propriedades');
 
     return Scaffold(
       appBar: AppBar(
@@ -97,13 +103,8 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                 Flexible(
                   flex: 1,
                   child: StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('propertask')
-                        .doc('propriedades')
-                        .collection('propriedades')
-                        .snapshots(),
+                    stream: propriedadesRef.snapshots(),
                     builder: (context, snapshot) {
-                      // Previne null ao iniciar app
                       final allDocs = snapshot.hasData
                           ? snapshot.data!.docs
                           : <QueryDocumentSnapshot>[];
@@ -155,11 +156,7 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                 Flexible(
                   flex: 1,
                   child: StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('propertask')
-                        .doc('propriedades')
-                        .collection('propriedades')
-                        .snapshots(),
+                    stream: propriedadesRef.snapshots(),
                     builder: (context, snapshot) {
                       final allDocs = snapshot.hasData
                           ? snapshot.data!.docs
@@ -214,11 +211,7 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
           // Lista de propriedades (apenas isso desliza)
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('propertask')
-                  .doc('propriedades')
-                  .collection('propriedades')
-                  .snapshots(),
+              stream: propriedadesRef.snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -230,7 +223,6 @@ class _PropriedadesScreenState extends State<PropriedadesScreen> {
                 }
 
                 final allDocs = snapshot.data!.docs;
-                // Opções dinâmicas já estão contempladas nos filtros acima
 
                 // Filtros + busca
                 final filtered = allDocs.where((doc) {
