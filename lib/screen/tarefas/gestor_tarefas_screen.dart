@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:propertask/core/providers/app_state.dart';
 import 'package:propertask/screen/tarefas/tarefa_detalhe_screen.dart';
 import 'package:propertask/screen/tarefas/tarefa_form_screen.dart';
 import 'package:propertask/widgets/app_drawer.dart';
@@ -33,6 +35,7 @@ class _GestorTarefasScreenState extends State<GestorTarefasScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final empresaId = Provider.of<AppState>(context).empresaId!;
 
     return Scaffold(
       appBar: AppBar(
@@ -206,8 +209,8 @@ class _GestorTarefasScreenState extends State<GestorTarefasScreen> {
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('propertask')
-                  .doc('tarefas')
+                  .collection('empresas')
+                  .doc(empresaId)
                   .collection('tarefas')
                   .where(
                     'data',

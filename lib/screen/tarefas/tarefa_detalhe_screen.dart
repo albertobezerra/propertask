@@ -37,13 +37,15 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
   String? inicioGeo, concluidaGeo;
 
   Map<String, dynamic>? propriedadeData;
+  late String empresaId;
 
   @override
   void initState() {
     super.initState();
+    empresaId = Provider.of<AppState>(context, listen: false).empresaId!;
     FirebaseFirestore.instance
-        .collection('propertask')
-        .doc('tarefas')
+        .collection('empresas')
+        .doc(empresaId)
         .collection('tarefas')
         .doc(widget.tarefaId)
         .snapshots()
@@ -95,8 +97,8 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
 
   Future<void> _loadPropriedade(String propId) async {
     final doc = await FirebaseFirestore.instance
-        .collection('propertask')
-        .doc('propriedades')
+        .collection('empresas')
+        .doc(empresaId)
         .collection('propriedades')
         .doc(propId)
         .get();
@@ -114,8 +116,8 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
       final geo =
           '${locData.latitude?.toStringAsFixed(5)},${locData.longitude?.toStringAsFixed(5)}';
       await FirebaseFirestore.instance
-          .collection('propertask')
-          .doc('tarefas')
+          .collection('empresas')
+          .doc(empresaId)
           .collection('tarefas')
           .doc(widget.tarefaId)
           .update({fieldTime: FieldValue.serverTimestamp(), fieldGeo: geo});
@@ -159,28 +161,25 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
       final file = await _compressImage(File(img.path));
       final fileName =
           '${widget.tarefaId}_${DateTime.now().millisecondsSinceEpoch}_${img.name}';
-      final ref = FirebaseStorage.instance.ref().child('tarefas/$fileName');
+      final ref = FirebaseStorage.instance.ref().child(
+        'tarefas/$empresaId/$fileName',
+      );
       await ref.putFile(file);
       final url = await ref.getDownloadURL();
       novasFotos.add(url);
 
-      // REMOVA do localTaskPhotos só quando UPLOAD e update Firestore finalizar!
       setState(() {
         localTaskPhotos.removeWhere((f) => f.path == img.path);
       });
     }
 
-    // Atualizar lista no Firestore
     final updatedList = [...(data['fotos'] ?? []), ...novasFotos];
     await FirebaseFirestore.instance
-        .collection('propertask')
-        .doc('tarefas')
+        .collection('empresas')
+        .doc(empresaId)
         .collection('tarefas')
         .doc(widget.tarefaId)
         .update({'fotos': updatedList});
-
-    // NÃO adicione manualmente as novas fotos na lista `taskPhotos` aqui!
-    // Espere os snapshots do Firestore atualizarem.
   }
 
   Future<void> _adicionarImagemCamera() async {
@@ -198,13 +197,15 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
     final file = await _compressImage(File(img.path));
     final fileName =
         '${widget.tarefaId}_${DateTime.now().millisecondsSinceEpoch}_${img.name}';
-    final ref = FirebaseStorage.instance.ref().child('tarefas/$fileName');
+    final ref = FirebaseStorage.instance.ref().child(
+      'tarefas/$empresaId/$fileName',
+    );
     await ref.putFile(file);
     final url = await ref.getDownloadURL();
     final updatedList = [...(data['fotos'] ?? []), url];
     await FirebaseFirestore.instance
-        .collection('propertask')
-        .doc('tarefas')
+        .collection('empresas')
+        .doc(empresaId)
         .collection('tarefas')
         .doc(widget.tarefaId)
         .update({'fotos': updatedList});
@@ -797,8 +798,8 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
     final list = List<String>.from(data['fotos'] ?? []);
     list.remove(url);
     await FirebaseFirestore.instance
-        .collection('propertask')
-        .doc('tarefas')
+        .collection('empresas')
+        .doc(empresaId)
         .collection('tarefas')
         .doc(widget.tarefaId)
         .update({'fotos': list});

@@ -12,7 +12,6 @@ import 'package:propertask/widgets/app_drawer.dart';
 
 class RelatoriosScreen extends StatefulWidget {
   const RelatoriosScreen({super.key});
-
   @override
   State<RelatoriosScreen> createState() => _RelatoriosScreenState();
 }
@@ -47,14 +46,17 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
       _dateRange!.end.month,
       _dateRange!.end.day,
     ).add(const Duration(days: 1));
-
     final inicio = Timestamp.fromDate(inicioDia);
     final fim = Timestamp.fromDate(fimDiaExclusivo);
 
     try {
+      final empresaId = Provider.of<AppState>(
+        context,
+        listen: false,
+      ).empresaId!;
       final tarefasRef = FirebaseFirestore.instance
-          .collection('propertask')
-          .doc('tarefas')
+          .collection('empresas')
+          .doc(empresaId)
           .collection('tarefas');
       final query = tarefasRef
           .where('status', isEqualTo: 'concluida')
@@ -84,8 +86,8 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
       final propFutures = {
         for (final id in propIds)
           id: FirebaseFirestore.instance
-              .collection('propertask')
-              .doc('propriedades')
+              .collection('empresas')
+              .doc(empresaId)
               .collection('propriedades')
               .doc(id)
               .get(),
@@ -93,8 +95,8 @@ class _RelatoriosScreenState extends State<RelatoriosScreen> {
       final userFutures = {
         for (final id in userIds)
           id: FirebaseFirestore.instance
-              .collection('propertask')
-              .doc('usuarios')
+              .collection('empresas')
+              .doc(empresaId)
               .collection('usuarios')
               .doc(id)
               .get(),

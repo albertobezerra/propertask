@@ -48,9 +48,13 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
 
   Future<void> _loadPropriedadeSofaCama(String propId) async {
     try {
+      final empresaId = Provider.of<AppState>(
+        context,
+        listen: false,
+      ).empresaId!;
       final snap = await FirebaseFirestore.instance
-          .collection('propertask')
-          .doc('propriedades')
+          .collection('empresas')
+          .doc(empresaId)
           .collection('propriedades')
           .doc(propId)
           .get();
@@ -75,6 +79,7 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final usuario = Provider.of<AppState>(context).usuario;
+    final empresaId = Provider.of<AppState>(context).empresaId!;
     final cargo = usuario?.cargo ?? 'LIMPEZA';
     final podeAtribuir = Permissions.cargoFromString(cargo) != Cargo.limpeza;
     final locale = Localizations.localeOf(context).toString();
@@ -109,8 +114,8 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
 
             FutureBuilder<QuerySnapshot>(
               future: FirebaseFirestore.instance
-                  .collection('propertask')
-                  .doc('propriedades')
+                  .collection('empresas')
+                  .doc(empresaId)
                   .collection('propriedades')
                   .orderBy('nome')
                   .get(),
@@ -154,8 +159,8 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
             if (podeAtribuir)
               FutureBuilder<QuerySnapshot>(
                 future: FirebaseFirestore.instance
-                    .collection('propertask')
-                    .doc('usuarios')
+                    .collection('empresas')
+                    .doc(empresaId)
                     .collection('usuarios')
                     .orderBy('nome')
                     .get(),
@@ -238,10 +243,15 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
     try {
+      final empresaId = Provider.of<AppState>(
+        context,
+        listen: false,
+      ).empresaId!;
+
       // Buscar nome da propriedade para salvar
       final propDoc = await FirebaseFirestore.instance
-          .collection('propertask')
-          .doc('propriedades')
+          .collection('empresas')
+          .doc(empresaId)
           .collection('propriedades')
           .doc(_propriedadeId!)
           .get();
@@ -251,8 +261,8 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
       String? responsavelNome;
       if (_responsavelId != null) {
         final userDoc = await FirebaseFirestore.instance
-            .collection('propertask')
-            .doc('usuarios')
+            .collection('empresas')
+            .doc(empresaId)
             .collection('usuarios')
             .doc(_responsavelId!)
             .get();
@@ -271,8 +281,8 @@ class _TarefaFormScreenState extends State<TarefaFormScreen> {
       final tituloAuto = '$tipoNome • ${dataFmt.format(_data)}';
 
       final ref = FirebaseFirestore.instance
-          .collection('propertask')
-          .doc('tarefas')
+          .collection('empresas')
+          .doc(empresaId)
           .collection('tarefas');
 
       final base = {
