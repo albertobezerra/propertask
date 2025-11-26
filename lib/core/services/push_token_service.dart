@@ -2,7 +2,7 @@
 import 'package:propertask/core/services/notifications_service.dart';
 
 class PushTokenService {
-  static Future<void> saveForUser(String uid) async {
-    await NotificationsService.instance.saveCurrentToken(uid);
+  static Future<void> saveForUser(String empresaId, String uid) async {
+    await NotificationsService.instance.saveCurrentToken(empresaId, uid);
   }
 }

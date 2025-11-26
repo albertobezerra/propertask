@@ -1,4 +1,3 @@
-// lib/core/services/notifications_service.dart
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -79,12 +78,13 @@ class NotificationsService {
     }
   }
 
-  Future<void> saveCurrentToken(String uid) async {
+  // ALTERADO: agora recebe empresaId!
+  Future<void> saveCurrentToken(String empresaId, String uid) async {
     final token = await _messaging.getToken();
     if (token == null) return;
     final ref = FirebaseFirestore.instance
-        .collection('propertask')
-        .doc('usuarios')
+        .collection('empresas')
+        .doc(empresaId)
         .collection('usuarios')
         .doc(uid)
         .collection('tokens')
@@ -98,8 +98,8 @@ class NotificationsService {
 
     _messaging.onTokenRefresh.listen((newToken) async {
       await FirebaseFirestore.instance
-          .collection('propertask')
-          .doc('usuarios')
+          .collection('empresas')
+          .doc(empresaId)
           .collection('usuarios')
           .doc(uid)
           .collection('tokens')
@@ -126,5 +126,5 @@ class NotificationsService {
 }
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Logger opcional
+  // Logger opcional (pode deixar vazio ou inserir logs de debug)
 }

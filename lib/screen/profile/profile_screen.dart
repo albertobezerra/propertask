@@ -39,8 +39,14 @@ class ProfileScreen extends StatelessWidget {
           await StorageService().deleteFileFromUrl(oldFotoUrl);
         }
         if (!context.mounted) return;
+        // << ALTERAÇÃO PARA MULTIEMPRESA AQUI >>
+        final empresaId = Provider.of<AppState>(
+          context,
+          listen: false,
+        ).empresaId!;
         final url = await StorageService().uploadUserProfileImageBytes(
           Uint8List.fromList(compressed),
+          empresaId,
           userId,
         );
         if (!context.mounted) return;

@@ -1,6 +1,8 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:propertask/widgets/app_drawer.dart';
+import 'package:provider/provider.dart';
+import 'package:propertask/core/providers/app_state.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LavanderiaScreen extends StatelessWidget {
   const LavanderiaScreen({super.key});
@@ -18,6 +20,8 @@ class LavanderiaScreen extends StatelessWidget {
     ); // Amanhã
     final fim = inicio.add(const Duration(days: 1));
     final cs = Theme.of(context).colorScheme;
+    // INDISPENSÁVEL: pegar o empresaId
+    final empresaId = Provider.of<AppState>(context, listen: false).empresaId!;
 
     return Scaffold(
       appBar: AppBar(
@@ -35,8 +39,8 @@ class LavanderiaScreen extends StatelessWidget {
       drawer: const AppDrawer(currentRoute: '/lavanderia'),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('propertask')
-            .doc('tarefas')
+            .collection('empresas')
+            .doc(empresaId)
             .collection('tarefas')
             .where('tipo', isEqualTo: 'limpeza')
             .where('data', isGreaterThanOrEqualTo: Timestamp.fromDate(inicio))
@@ -62,8 +66,8 @@ class LavanderiaScreen extends StatelessWidget {
 
           return FutureBuilder<QuerySnapshot>(
             future: FirebaseFirestore.instance
-                .collection('propertask')
-                .doc('propriedades')
+                .collection('empresas')
+                .doc(empresaId)
                 .collection('propriedades')
                 .where(FieldPath.documentId, whereIn: propIds)
                 .get(),

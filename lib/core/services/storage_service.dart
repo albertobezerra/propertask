@@ -10,10 +10,13 @@ class StorageService {
   // Foto de perfil (com upload de bytes já comprimido)
   Future<String> uploadUserProfileImageBytes(
     Uint8List bytes,
+    String empresaId,
     String userId,
   ) async {
     final filename = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final ref = _storage.ref().child('propertask/perfil/$userId/$filename');
+    final ref = _storage.ref().child(
+      'empresas/$empresaId/perfil/$userId/$filename',
+    );
     final snapshot = await ref.putData(bytes);
     return await snapshot.ref.getDownloadURL();
   }
@@ -28,25 +31,28 @@ class StorageService {
     }
   }
 
-  // Métodos antigos mantidos para propriedade/tarefa
+  // Imagem de PROPRIEDADE
   Future<String> uploadPropriedadeImage(
     XFile file,
+    String empresaId,
     String propriedadeId,
   ) async {
     final ref = _storage.ref().child(
-      'propertask/propriedades/$propriedadeId/${DateTime.now().millisecondsSinceEpoch}_${file.name}',
+      'empresas/$empresaId/propriedades/$propriedadeId/${DateTime.now().millisecondsSinceEpoch}_${file.name}',
     );
     final snapshot = await ref.putFile(File(file.path));
     return await snapshot.ref.getDownloadURL();
   }
 
+  // Imagem de TAREFA
   Future<String> uploadTarefaImage(
     XFile file,
+    String empresaId,
     String propriedadeId,
     String tarefaId,
   ) async {
     final ref = _storage.ref().child(
-      'propertask/tarefas/$propriedadeId/$tarefaId/${DateTime.now().millisecondsSinceEpoch}_${file.name}',
+      'empresas/$empresaId/tarefas/$propriedadeId/$tarefaId/${DateTime.now().millisecondsSinceEpoch}_${file.name}',
     );
     final snapshot = await ref.putFile(File(file.path));
     return await snapshot.ref.getDownloadURL();

@@ -2,10 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 
 class PontoService {
-  final _db = FirebaseFirestore.instance;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  CollectionReference get _registros =>
-      _db.collection('propertask').doc('ponto').collection('registros');
+  // REFACTORIZADO: recebe empresaId explicitamente
+  CollectionReference _registros(String empresaId) =>
+      _db.collection('empresas').doc(empresaId).collection('pontoRegistros');
 
   DateTime _arredondarHora(DateTime hora) {
     final minutos = hora.minute;
@@ -21,7 +22,9 @@ class PontoService {
     return novaHora.add(Duration(minutes: arredondado));
   }
 
+  // REFACTORIZADO: recebe empresaId explicitamente!
   Future<void> registrarPonto(
+    String empresaId,
     String usuarioId,
     String tipo,
     String? observacao,
@@ -30,7 +33,7 @@ class PontoService {
     final agora = DateTime.now();
     final arredondado = _arredondarHora(agora);
 
-    await _registros.add({
+    await _registros(empresaId).add({
       'usuarioId': usuarioId,
       'tipo': tipo,
       'horarioReal': Timestamp.fromDate(agora),
