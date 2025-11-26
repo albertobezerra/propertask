@@ -53,6 +53,7 @@ dependencies:
   location: ^8.0.1
   geocoding: ^4.0.0
   timer_builder: ^2.0.0
+  photo_view: ^0.15.0
 
 dev_dependencies:
   flutter_test:

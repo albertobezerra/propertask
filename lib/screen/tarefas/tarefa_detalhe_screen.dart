@@ -12,6 +12,8 @@ import 'package:map_launcher/map_launcher.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:propertask/core/providers/app_state.dart';
 import 'package:propertask/core/utils/permissions.dart';
+import 'package:photo_view/photo_view.dart';
+import 'package:photo_view/photo_view_gallery.dart';
 
 class TarefaDetalheScreen extends StatefulWidget {
   final String tarefaId;
@@ -147,9 +149,12 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
       maxHeight: 1200,
     );
     if (!mounted || imagens.isEmpty) return;
+
     setState(() {
       localTaskPhotos.addAll(imagens.map((img) => File(img.path)));
     });
+
+    List<String> novasFotos = [];
     for (final img in imagens) {
       final file = await _compressImage(File(img.path));
       final fileName =
@@ -157,19 +162,21 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
       final ref = FirebaseStorage.instance.ref().child('tarefas/$fileName');
       await ref.putFile(file);
       final url = await ref.getDownloadURL();
-      final updatedList = [...(data['fotos'] ?? []), url];
-      await FirebaseFirestore.instance
-          .collection('propertask')
-          .doc('tarefas')
-          .collection('tarefas')
-          .doc(widget.tarefaId)
-          .update({'fotos': updatedList});
-      if (!mounted) return;
+      novasFotos.add(url);
       setState(() {
-        taskPhotos.add(url);
         localTaskPhotos.removeWhere((f) => f.path == img.path);
       });
     }
+    final updatedList = [...(data['fotos'] ?? []), ...novasFotos];
+    await FirebaseFirestore.instance
+        .collection('propertask')
+        .doc('tarefas')
+        .collection('tarefas')
+        .doc(widget.tarefaId)
+        .update({'fotos': updatedList});
+    setState(() {
+      taskPhotos.addAll(novasFotos);
+    });
   }
 
   Future<void> _adicionarImagemCamera() async {
@@ -230,24 +237,44 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
     );
   }
 
-  void _mostrarImagemFull(String urlOrPath, {bool local = false}) {
+  // Método para mostrar galeria
+  void _mostrarGaleriaFotos(BuildContext context, int indexInicial) {
     showDialog(
       context: context,
-      builder: (ctx) => Dialog(
-        child: Stack(
-          alignment: Alignment.topRight,
-          children: [
-            InteractiveViewer(
-              child: local
-                  ? Image.file(File(urlOrPath))
-                  : Image.network(urlOrPath),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => Navigator.pop(ctx),
-              color: Colors.white,
-            ),
-          ],
+      builder: (_) => Dialog(
+        insetPadding: const EdgeInsets.all(12),
+        backgroundColor: Colors.black87,
+        child: SizedBox(
+          width: double.infinity,
+          height: 420, // ajuste conforme necessário
+          child: Stack(
+            children: [
+              PhotoViewGallery.builder(
+                itemCount: taskPhotos.length,
+                pageController: PageController(initialPage: indexInicial),
+                builder: (context, index) {
+                  final url = taskPhotos[index];
+                  return PhotoViewGalleryPageOptions(
+                    imageProvider: NetworkImage(url),
+                    minScale: PhotoViewComputedScale.contained,
+                    maxScale: PhotoViewComputedScale.covered * 2,
+                  );
+                },
+                backgroundDecoration: const BoxDecoration(
+                  color: Colors.black87,
+                ),
+              ),
+              // Ícone de fechar (X)
+              Positioned(
+                top: 16,
+                right: 16,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -507,121 +534,133 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
               status == 'reaberta' ||
               status == 'concluida') ...[
             const SizedBox(height: 16),
-            SizedBox(
-              height: 92,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  ...localTaskPhotos.map(
-                    (f) => GestureDetector(
-                      onTap: () => _mostrarImagemFull(f.path, local: true),
-                      child: Container(
-                        width: 90,
-                        margin: const EdgeInsets.only(right: 10),
-                        child: Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.file(
-                                f,
-                                width: 90,
-                                height: 90,
-                                fit: BoxFit.cover,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return SizedBox(
+                  width: constraints.maxWidth,
+                  height: 92,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      // Botão de adicionar foto sempre na esquerda
+                      if ((status == 'em_andamento' || status == 'reaberta') &&
+                          isAtribuido)
+                        GestureDetector(
+                          onTap: () => _escolherTipoImagem(context),
+                          child: Container(
+                            width: 90,
+                            height: 90,
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: cs.primary.withAlpha(20),
+                              borderRadius: BorderRadius.circular(11),
+                              border: Border.all(color: cs.primary, width: 1.5),
+                            ),
+                            child: Center(
+                              child: Icon(
+                                Icons.camera_alt,
+                                color: cs.primary,
+                                size: 35,
                               ),
                             ),
-                            Positioned(
-                              top: 2,
-                              right: 2,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withAlpha(80),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(2.0),
-                                  child: SizedBox(
-                                    height: 18,
-                                    width: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                  ...taskPhotos.map(
-                    (url) => GestureDetector(
-                      onTap: () => _mostrarImagemFull(url),
-                      child: Container(
-                        width: 90,
-                        margin: const EdgeInsets.only(right: 10),
-                        child: Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: Image.network(
-                                url,
-                                width: 90,
-                                height: 90,
-                                fit: BoxFit.cover,
+                      // Fotos locais (em upload)
+                      ...localTaskPhotos.asMap().entries.map((entry) {
+                        final f = entry.value;
+                        return Container(
+                          width: 90,
+                          margin: const EdgeInsets.only(right: 10),
+                          child: Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.file(
+                                  f,
+                                  width: 90,
+                                  height: 90,
+                                  fit: BoxFit.cover,
+                                ),
                               ),
-                            ),
-                            if ((status == 'em_andamento' ||
-                                    status == 'reaberta') &&
-                                isAtribuido)
                               Positioned(
                                 top: 2,
                                 right: 2,
-                                child: InkWell(
-                                  onTap: () async => await _deleteImage(url),
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withAlpha(80),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.close,
-                                      size: 18,
-                                      color: Colors.white,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withAlpha(80),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(2.0),
+                                    child: SizedBox(
+                                      height: 18,
+                                      width: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  if ((status == 'em_andamento' || status == 'reaberta') &&
-                      isAtribuido)
-                    GestureDetector(
-                      onTap: () => _escolherTipoImagem(context),
-                      child: Container(
-                        width: 90,
-                        height: 90,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: cs.primary.withAlpha(20),
-                          borderRadius: BorderRadius.circular(11),
-                          border: Border.all(color: cs.primary, width: 1.5),
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.camera_alt,
-                            color: cs.primary,
-                            size: 35,
+                            ],
                           ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+                        );
+                      }),
+                      // Fotos da tarefa (Firebase)
+                      ...taskPhotos.asMap().entries.map((entry) {
+                        final i = entry.key;
+                        final url = entry.value;
+                        return GestureDetector(
+                          onTap: () => _mostrarGaleriaFotos(context, i),
+                          child: Container(
+                            width: 90,
+                            margin: const EdgeInsets.only(right: 10),
+                            child: Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.network(
+                                    url,
+                                    width: 90,
+                                    height: 90,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                if ((status == 'em_andamento' ||
+                                        status == 'reaberta') &&
+                                    isAtribuido)
+                                  Positioned(
+                                    top: 2,
+                                    right: 2,
+                                    child: InkWell(
+                                      onTap: () async =>
+                                          await _deleteImage(url),
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withAlpha(80),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Tooltip(
+                                          message: 'Excluir foto',
+                                          child: Icon(
+                                            Icons.delete,
+                                            size: 18,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                );
+              },
             ),
           ],
           const SizedBox(height: 21),
@@ -706,7 +745,7 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
         .doc(widget.tarefaId)
         .update({'fotos': list});
     setState(() {
-      taskPhotos.remove(url);
+      taskPhotos = List<String>.from(list);
     });
   }
 }
