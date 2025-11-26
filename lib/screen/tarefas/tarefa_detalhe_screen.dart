@@ -246,7 +246,7 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
     final pageController = PageController(initialPage: indexInicial);
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.8), // overlay bonito!
+      barrierColor: Colors.black.withValues(alpha: 0.8), // overlay bonito!
       builder: (ctx) {
         int atual = indexInicial;
         return StatefulBuilder(
@@ -291,7 +291,7 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
                             );
                           },
                           backgroundDecoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0),
+                            color: Colors.black.withValues(alpha: 0),
                           ),
                         ),
                       ),
