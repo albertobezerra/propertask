@@ -29,6 +29,7 @@ class _EquipeScreenState extends State<EquipeScreen> {
     final podeEditar = Permissions.podeGerenciarUsuarios(cargo);
     final emailAtual = appState.usuario?.email ?? '';
     final senhaAtual = appState.senhaUsuario ?? '';
+    final empresaId = appState.empresaId!;
 
     return Scaffold(
       appBar: AppBar(
@@ -84,8 +85,8 @@ class _EquipeScreenState extends State<EquipeScreen> {
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('propertask')
-                  .doc('usuarios')
+                  .collection('empresas')
+                  .doc(empresaId)
                   .collection('usuarios')
                   .snapshots(),
               builder: (context, snapshot) {
