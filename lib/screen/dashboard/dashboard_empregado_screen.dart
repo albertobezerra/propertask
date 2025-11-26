@@ -66,11 +66,9 @@ class _DashboardEmpregadoScreenState extends State<DashboardEmpregadoScreen> {
             const SizedBox(height: 18),
             Expanded(
               child: StreamBuilder<List<Tarefa>>(
-                stream: FirestoreService().getTarefasDoDia(
-                  _selectedDate,
-                  user.uid,
-                  cargo,
-                ),
+                stream: FirestoreService(
+                  empresaId: appState.empresaId!,
+                ).getTarefasDoDia(_selectedDate, user.uid, cargo),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());

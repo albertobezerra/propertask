@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 
 class CompanySetupService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -12,14 +11,7 @@ class CompanySetupService {
     required String coordenadorNome,
   }) async {
     final empresaRef = _firestore.collection('empresas').doc(empresaId);
-
-    final doc = await empresaRef.get();
-    if (doc.exists) {
-      debugPrint('⚠️ Empresa "$empresaId" já existe. Pulando criação.');
-      return;
-    }
-
-    debugPrint('🏗️ Criando empresa "$nomeEmpresa"...');
+    if ((await empresaRef.get()).exists) return;
 
     await empresaRef.set({
       'nome': nomeEmpresa,
@@ -29,19 +21,21 @@ class CompanySetupService {
     });
 
     await empresaRef.collection('usuarios').doc(coordenadorUid).set({
-      'uid': coordenadorUid,
+      'id': coordenadorUid,
+      'empresaId': empresaId,
       'nome': coordenadorNome,
       'email': coordenadorEmail,
-      'cargo': 'Coordenador',
+      'cargo': 'COORDENADOR',
       'criadoEm': FieldValue.serverTimestamp(),
+      'ativo': true,
     });
 
     await empresaRef.collection('propriedades').add({
       'nome': 'Propriedade Exemplo',
       'localizacao': 'A definir',
+      'tipologia': 'T1',
+      'acesso': 'chave',
       'criadoEm': FieldValue.serverTimestamp(),
     });
-
-    debugPrint('✅ Empresa "$nomeEmpresa" criada com sucesso!');
   }
 }

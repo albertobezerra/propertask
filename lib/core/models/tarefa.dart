@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Tarefa {
   final String id;
+  final String empresaId; // NOVO
   final String titulo;
   final String tipo;
   final String propriedadeId;
@@ -13,6 +14,7 @@ class Tarefa {
 
   Tarefa({
     required this.id,
+    required this.empresaId, // NOVO
     required this.titulo,
     required this.tipo,
     required this.propriedadeId,
@@ -27,6 +29,7 @@ class Tarefa {
     final data = doc.data() as Map<String, dynamic>;
     return Tarefa(
       id: doc.id,
+      empresaId: data['empresaId'] ?? '', // NOVO
       titulo: data['titulo'] ?? '',
       tipo: data['tipo'] ?? 'limpeza',
       propriedadeId: data['propriedadeId'] ?? '',
@@ -41,6 +44,7 @@ class Tarefa {
   }
 
   Map<String, dynamic> toFirestore() => {
+    'empresaId': empresaId, // NOVO
     'titulo': titulo,
     'tipo': tipo,
     'propriedadeId': propriedadeId,

@@ -5,13 +5,14 @@ import 'package:propertask/core/models/tarefa.dart';
 import 'package:propertask/core/models/usuario.dart';
 
 class FirestoreService {
+  final String empresaId;
   final _db = FirebaseFirestore.instance;
 
+  FirestoreService({required this.empresaId});
+
   // PROPRIEDADES
-  CollectionReference get _props => _db
-      .collection('propertask')
-      .doc('propriedades')
-      .collection('propriedades');
+  CollectionReference get _props =>
+      _db.collection('empresas').doc(empresaId).collection('propriedades');
 
   Stream<List<Propriedade>> getPropriedades() => _props.snapshots().map(
     (s) => s.docs
@@ -27,7 +28,7 @@ class FirestoreService {
 
   // TAREFAS
   CollectionReference get _tarefas =>
-      _db.collection('propertask').doc('tarefas').collection('tarefas');
+      _db.collection('empresas').doc(empresaId).collection('tarefas');
 
   Stream<List<Tarefa>> getTarefasDoDia(DateTime dia, String uid, String cargo) {
     final inicio = DateTime(dia.year, dia.month, dia.day);
@@ -64,7 +65,7 @@ class FirestoreService {
 
   // USUÁRIOS
   CollectionReference get _usuarios =>
-      _db.collection('propertask').doc('usuarios').collection('usuarios');
+      _db.collection('empresas').doc(empresaId).collection('usuarios');
 
   Stream<List<Usuario>> getUsuarios() => _usuarios.snapshots().map(
     (s) => s.docs

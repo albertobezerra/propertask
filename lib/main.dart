@@ -10,8 +10,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'package:propertask/conf/app_theme.dart';
 
+import 'package:propertask/conf/app_theme.dart';
 import 'package:propertask/core/providers/app_state.dart';
 import 'package:propertask/screen/dashboard/dashboard_screen.dart';
 import 'package:propertask/screen/login/login_screen.dart';
@@ -24,23 +24,15 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 // Handler de mensagens em background (Android)
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Opcional: logging/analytics
+  // Pode adicionar logging/analytics se quiser!
 }
 
-// Inicialização de push e notificação local
 Future<void> _initPush() async {
   final messaging = FirebaseMessaging.instance;
-
-  // Permissões iOS
   await messaging.requestPermission(alert: true, badge: true, sound: true);
-
-  // Background
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // Inicialização do plugin local
-  const initAndroid = AndroidInitializationSettings(
-    'ic_notification',
-  ); // ou '@mipmap/ic_launcher'
+  const initAndroid = AndroidInitializationSettings('ic_notification');
   const initSettings = InitializationSettings(android: initAndroid);
   await notifications.initialize(
     initSettings,
@@ -50,7 +42,6 @@ Future<void> _initPush() async {
     },
   );
 
-  // Canal Android (uma vez)
   final android = notifications
       .resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin
@@ -64,7 +55,6 @@ Future<void> _initPush() async {
     ),
   );
 
-  // App em foreground: mostrar banner local
   FirebaseMessaging.onMessage.listen((msg) async {
     final title = msg.notification?.title ?? 'Nova tarefa';
     final body = msg.notification?.body ?? '';
@@ -86,25 +76,21 @@ Future<void> _initPush() async {
     );
   });
 
-  // Tocou na notificação (app background/terminado)
   FirebaseMessaging.onMessageOpenedApp.listen((msg) {
     final route = msg.data['route'] ?? '';
     _openRoute(route);
   });
 
-  // App aberto a partir de notificação (terminado)
   final initialMsg = await messaging.getInitialMessage();
   if (initialMsg != null) {
     _openRoute(initialMsg.data['route'] ?? '');
   }
 }
 
-// Abrir rotas vindas da notificação
 void _openRoute(String route) {
   if (route.isEmpty) return;
   final nav = navigatorKey.currentState;
   if (nav == null) return;
-
   if (route.startsWith('/tarefas/')) {
     final id = route.split('/').last;
     nav.push(
@@ -129,13 +115,12 @@ Future<void> main() async {
 
 class PropertaskApp extends StatelessWidget {
   const PropertaskApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
       title: 'Propertask',
-      theme: appTheme, // <<< Use seu ThemeData custom aqui!
+      theme: appTheme,
       darkTheme: ThemeData.dark(),
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -164,20 +149,20 @@ class _AuthWrapperState extends State<AuthWrapper> {
     super.initState();
     final appState = Provider.of<AppState>(context, listen: false);
 
-    _sub = FirebaseAuth.instance.authStateChanges().listen(
-      (user) async {
-        if (!mounted) return;
-        appState.setUser(user);
-        if (user != null) {
-          await appState.carregarPerfil(user);
-          await _saveFcmToken(user.uid); // salva token FCM do usuário logado
+    _sub = FirebaseAuth.instance.authStateChanges().listen((user) async {
+      if (!mounted) return;
+      appState.setUser(user);
+
+      if (user != null) {
+        // carrega perfil e empresaId do usuário SEM collectionGroup
+        await appState.carregarPerfil(user);
+        if (appState.usuario != null) {
+          await _saveFcmToken(user, appState.usuario!.empresaId);
         }
-        if (mounted && !_authReady) setState(() => _authReady = true);
-      },
-      onError: (_) {
-        if (mounted && !_authReady) setState(() => _authReady = true);
-      },
-    );
+      }
+
+      if (mounted && !_authReady) setState(() => _authReady = true);
+    });
   }
 
   @override
@@ -242,29 +227,30 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return const DashboardScreen();
   }
 
-  Future<void> _saveFcmToken(String uid) async {
+  Future<void> _saveFcmToken(User user, String empresaId) async {
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null) return;
+
       await FirebaseFirestore.instance
-          .collection('propertask')
-          .doc('usuarios')
+          .collection('empresas')
+          .doc(empresaId)
           .collection('usuarios')
-          .doc(uid)
+          .doc(user.uid)
           .collection('tokens')
           .doc(token)
           .set({
             'token': token,
-            'plataforma': Platform.operatingSystem, // <- sem context
+            'plataforma': Platform.operatingSystem,
             'atualizadoEm': FieldValue.serverTimestamp(),
           });
 
       FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
         await FirebaseFirestore.instance
-            .collection('propertask')
-            .doc('usuarios')
+            .collection('empresas')
+            .doc(empresaId)
             .collection('usuarios')
-            .doc(uid)
+            .doc(user.uid)
             .collection('tokens')
             .doc(newToken)
             .set({

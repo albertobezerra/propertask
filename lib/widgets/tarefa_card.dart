@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:propertask/core/models/tarefa.dart';
 import 'package:propertask/core/utils/formatters.dart';
 import 'package:propertask/core/services/firestore_service.dart';
+import 'package:provider/provider.dart';
+import 'package:propertask/core/providers/app_state.dart';
 
 class TarefaCard extends StatelessWidget {
   final Tarefa tarefa;
@@ -82,7 +84,13 @@ class TarefaCard extends StatelessWidget {
               navigator.pop();
 
               try {
-                await FirestoreService().deleteTarefa(tarefa.id);
+                final empresaId = Provider.of<AppState>(
+                  context,
+                  listen: false,
+                ).empresaId!;
+                await FirestoreService(
+                  empresaId: empresaId,
+                ).deleteTarefa(tarefa.id);
 
                 if (!context.mounted) return;
 

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Propriedade {
   final String id;
+  final String empresaId; // NOVO
   final String nome;
   final String endereco;
   final String acesso;
@@ -13,6 +14,7 @@ class Propriedade {
 
   Propriedade({
     required this.id,
+    required this.empresaId, // NOVO
     required this.nome,
     required this.endereco,
     required this.acesso,
@@ -27,6 +29,7 @@ class Propriedade {
     final data = doc.data() as Map<String, dynamic>;
     return Propriedade(
       id: doc.id,
+      empresaId: data['empresaId'] ?? '', // NOVO
       nome: data['nome'] ?? '',
       endereco: data['endereco'] ?? '',
       acesso: data['acesso'] ?? 'chave',
@@ -39,6 +42,7 @@ class Propriedade {
   }
 
   Map<String, dynamic> toFirestore() => {
+    'empresaId': empresaId, // NOVO
     'nome': nome,
     'endereco': endereco,
     'acesso': acesso,
