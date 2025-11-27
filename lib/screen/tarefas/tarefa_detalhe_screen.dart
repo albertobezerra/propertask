@@ -731,11 +731,12 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
                     onPressed: () async {
                       setState(() => loading = true);
                       await FirebaseFirestore.instance
-                          .collection('propertask')
-                          .doc('tarefas')
+                          .collection('empresas')
+                          .doc(empresaId)
                           .collection('tarefas')
                           .doc(widget.tarefaId)
                           .update({'status': 'em_andamento'});
+
                       await _getLocationAndTime('inicioEm', 'inicioGeo');
                       setState(() => loading = false);
                     },
@@ -752,8 +753,8 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
                     onPressed: () async {
                       setState(() => loading = true);
                       await FirebaseFirestore.instance
-                          .collection('propertask')
-                          .doc('tarefas')
+                          .collection('empresas')
+                          .doc(empresaId)
                           .collection('tarefas')
                           .doc(widget.tarefaId)
                           .update({'status': 'concluida'});
@@ -773,8 +774,8 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
                     onPressed: () async {
                       setState(() => loading = true);
                       await FirebaseFirestore.instance
-                          .collection('propertask')
-                          .doc('tarefas')
+                          .collection('empresas')
+                          .doc(empresaId)
                           .collection('tarefas')
                           .doc(widget.tarefaId)
                           .update({'status': 'reaberta'});

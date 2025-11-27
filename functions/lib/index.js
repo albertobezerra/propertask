@@ -34,37 +34,61 @@ var __importStar = (this && this.__importStar) || (function () {
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.onTaskWrite = void 0;
-// functions/src/index.ts
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 admin.initializeApp();
 exports.onTaskWrite = functions.region('europe-west1').firestore
-    .document('propertask/tarefas/tarefas/{id}')
+    .document('empresas/{empresaId}/tarefas/{tarefaId}')
     .onWrite(async (change, ctx) => {
     var _a, _b;
+    console.error('DEBUG FORÇADO');
     const after = change.after.exists ? change.after.data() : null;
     const before = change.before.exists ? change.before.data() : null;
-    if (!after)
+    console.log('onTaskWrite fired', {
+        empresaId: ctx.params.empresaId,
+        tarefaId: ctx.params.tarefaId,
+    });
+    if (!after) {
+        console.log('no after doc, exiting');
         return;
+    }
     const newResp = after.responsavelId;
     const oldResp = before === null || before === void 0 ? void 0 : before.responsavelId;
-    if (!newResp || newResp === oldResp)
+    console.log('responsavelId before/after', { oldResp, newResp });
+    if (!newResp || newResp === oldResp) {
+        console.log('no new responsavel or unchanged, exiting');
         return;
-    const tokensSnap = await admin.firestore()
-        .collection('propertask').doc('usuarios').collection('usuarios')
-        .doc(newResp).collection('tokens').get();
-    const tokens = tokensSnap.docs.map(d => d.id).filter(Boolean);
-    if (!tokens.length)
+    }
+    const empresaId = ctx.params.empresaId;
+    const tarefaId = ctx.params.tarefaId;
+    const tokensSnap = await admin
+        .firestore()
+        .collection('empresas')
+        .doc(empresaId)
+        .collection('usuarios')
+        .doc(newResp)
+        .collection('tokens')
+        .get();
+    const tokens = tokensSnap.docs.map((d) => d.id).filter(Boolean);
+    console.log('found tokens', tokens);
+    if (!tokens.length) {
+        console.log('no tokens for user, exiting');
         return;
+    }
     const titulo = (_a = after.titulo) !== null && _a !== void 0 ? _a : 'Nova tarefa';
     const prop = (_b = after.propriedadeNome) !== null && _b !== void 0 ? _b : '';
-    const route = `/tarefas/${ctx.params.id}`;
+    const route = `/tarefas/${tarefaId}`;
     const message = {
-        notification: { title: 'Nova tarefa atribuída', body: `${titulo} — ${prop}` },
+        notification: {
+            title: 'Nova tarefa atribuída',
+            body: `${titulo} — ${prop}`,
+        },
         data: { route },
         tokens,
         android: { priority: 'high' },
         apns: { headers: { 'apns-priority': '10' } },
     };
-    await admin.messaging().sendEachForMulticast(message);
+    console.log('sending multicast', JSON.stringify(message));
+    const resp = await admin.messaging().sendEachForMulticast(message);
+    console.log('multicast response', JSON.stringify(resp));
 });
