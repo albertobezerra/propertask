@@ -48,68 +48,58 @@ exports.onTaskWrite = functions.region('europe-west1').firestore
         return;
     const empresaId = ctx.params.empresaId;
     const tarefaId = ctx.params.tarefaId;
-    // Pega quem fez a mudança (se disponível no contexto)
     const executorId = ((_a = ctx.auth) === null || _a === void 0 ? void 0 : _a.uid) || null;
     // ============ CENÁRIO 1: Nova atribuição ============
     const newResp = after.responsavelId;
     const oldResp = before === null || before === void 0 ? void 0 : before.responsavelId;
     if (newResp && newResp !== oldResp) {
-        console.log('nova atribuição detectada');
-        await notificarUsuario(empresaId, newResp, 'Nova tarefa atribuída', `${(_b = after.titulo) !== null && _b !== void 0 ? _b : 'Tarefa'} — ${(_c = after.propriedadeNome) !== null && _c !== void 0 ? _c : ''}`, tarefaId, executorId // não notifica quem atribuiu
-        );
+        console.log('Nova atribuição detectada');
+        await notificarUsuario(empresaId, newResp, 'Nova tarefa atribuída', `${(_b = after.titulo) !== null && _b !== void 0 ? _b : 'Tarefa'} — ${(_c = after.propriedadeNome) !== null && _c !== void 0 ? _c : ''}`, tarefaId, executorId);
     }
     // ============ CENÁRIO 2: Tarefa iniciada ============
     const newStatus = after.status;
     const oldStatus = before === null || before === void 0 ? void 0 : before.status;
     if (newStatus === 'em_andamento' && oldStatus === 'pendente') {
-        console.log('tarefa iniciada - notificar gestores');
-        await notificarGestores(empresaId, '🟡 Tarefa Iniciada', `${(_d = after.responsavelNome) !== null && _d !== void 0 ? _d : 'Alguém'} iniciou ${formatTipo(after.tipo)} em ${(_e = after.propriedadeNome) !== null && _e !== void 0 ? _e : ''}`, tarefaId, after.responsavelId // não notifica quem iniciou
-        );
+        console.log('Tarefa iniciada - notificar gestores');
+        await notificarGestores(empresaId, '🟡 Tarefa Iniciada', `${(_d = after.responsavelNome) !== null && _d !== void 0 ? _d : 'Alguém'} iniciou ${formatTipo(after.tipo)} em ${(_e = after.propriedadeNome) !== null && _e !== void 0 ? _e : ''}`, tarefaId, after.responsavelId);
     }
     // ============ CENÁRIO 3: Tarefa concluída ============
     if (newStatus === 'concluida' && oldStatus !== 'concluida') {
-        console.log('tarefa concluída - notificar gestores');
-        await notificarGestores(empresaId, '✅ Tarefa Concluída', `${(_f = after.responsavelNome) !== null && _f !== void 0 ? _f : 'Alguém'} concluiu ${formatTipo(after.tipo)} em ${(_g = after.propriedadeNome) !== null && _g !== void 0 ? _g : ''}`, tarefaId, after.responsavelId // não notifica quem concluiu
-        );
+        console.log('Tarefa concluída - notificar gestores');
+        await notificarGestores(empresaId, '✅ Tarefa Concluída', `${(_f = after.responsavelNome) !== null && _f !== void 0 ? _f : 'Alguém'} concluiu ${formatTipo(after.tipo)} em ${(_g = after.propriedadeNome) !== null && _g !== void 0 ? _g : ''}`, tarefaId, after.responsavelId);
     }
     // ============ CENÁRIO 4: Tarefa reaberta ============
     if (newStatus === 'reaberta' && oldStatus !== 'reaberta') {
-        console.log('tarefa reaberta');
-        // Notifica o responsável (se não for ele que reabriu)
+        console.log('Tarefa reaberta');
+        // Notifica o responsável
         if (after.responsavelId && after.responsavelId !== executorId) {
             await notificarUsuario(empresaId, after.responsavelId, '⚠️ Tarefa Reaberta', `A tarefa de ${formatTipo(after.tipo)} em ${(_h = after.propriedadeNome) !== null && _h !== void 0 ? _h : ''} foi reaberta`, tarefaId, executorId);
         }
-        // Notifica gestores (exceto quem reabriu)
-        await notificarGestores(empresaId, '⚠️ Tarefa Reaberta', `${(_j = after.responsavelNome) !== null && _j !== void 0 ? _j : 'Alguém'} teve a tarefa de ${formatTipo(after.tipo)} reaberta`, tarefaId, executorId // não notifica quem reabriu
-        );
+        // Notifica gestores
+        await notificarGestores(empresaId, '⚠️ Tarefa Reaberta', `${(_j = after.responsavelNome) !== null && _j !== void 0 ? _j : 'Alguém'} teve a tarefa de ${formatTipo(after.tipo)} reaberta`, tarefaId, executorId);
     }
 });
 // ============ NOTIFICAÇÃO AGENDADA: Lembretes e alertas ============
-// Roda a cada 2 horas para cobrir todos os timezones
 exports.verificarTarefas = functions
     .region('europe-west1')
-    .pubsub.schedule('0 */2 * * *') // A cada 2 horas
+    .pubsub.schedule('0 */2 * * *')
     .timeZone('UTC')
     .onRun(async () => {
     console.log('Verificando tarefas em todas as empresas');
     const db = admin.firestore();
     const agora = new Date();
-    const horaAtual = agora.getUTCHours();
-    // Busca todas as empresas
     const empresasSnap = await db.collection('empresas').get();
     for (const empresaDoc of empresasSnap.docs) {
         const empresaId = empresaDoc.id;
         const empresaData = empresaDoc.data();
-        // Pega timezone da empresa (padrão: Europe/Lisbon se não tiver)
         const empresaTimezone = empresaData.timezone || 'Europe/Lisbon';
-        // Calcula hora local da empresa
         const horaLocalEmpresa = calcularHoraLocal(agora, empresaTimezone);
-        console.log(`Empresa ${empresaId}: hora local ~${horaLocalEmpresa}h (timezone: ${empresaTimezone})`);
-        // ======== LEMBRETES MATINAIS (entre 8h e 10h local) ========
+        console.log(`Empresa ${empresaId}: ${horaLocalEmpresa}h (${empresaTimezone})`);
+        // Lembretes matinais (8h-10h)
         if (horaLocalEmpresa >= 8 && horaLocalEmpresa < 10) {
             await enviarLembretesDiarios(db, empresaId);
         }
-        // ======== ALERTAS DE TAREFAS ATRASADAS (entre 15h e 17h local) ========
+        // Alertas de tarefas atrasadas (15h-17h)
         if (horaLocalEmpresa >= 15 && horaLocalEmpresa < 17) {
             await enviarAlertasAtrasadas(db, empresaId);
         }
@@ -123,6 +113,14 @@ async function enviarLembretesDiarios(db, empresaId) {
     hoje.setHours(0, 0, 0, 0);
     const amanha = new Date(hoje);
     amanha.setDate(amanha.getDate() + 1);
+    // Verifica se já enviou hoje
+    const configRef = db.collection('empresas').doc(empresaId).collection('config').doc('notificacoes');
+    const configSnap = await configRef.get();
+    const hojeStr = hoje.toISOString().split('T')[0];
+    if (configSnap.exists && ((_a = configSnap.data()) === null || _a === void 0 ? void 0 : _a.ultimoLembrete) === hojeStr) {
+        console.log(`Lembretes já enviados hoje para ${empresaId}`);
+        return;
+    }
     const tarefasSnap = await db
         .collection('empresas')
         .doc(empresaId)
@@ -132,28 +130,26 @@ async function enviarLembretesDiarios(db, empresaId) {
         .where('data', '<', admin.firestore.Timestamp.fromDate(amanha))
         .get();
     console.log(`Empresa ${empresaId}: ${tarefasSnap.size} tarefas pendentes hoje`);
-    // Verifica se já enviou lembretes hoje
-    const configRef = db.collection('empresas').doc(empresaId).collection('config').doc('notificacoes');
-    const configSnap = await configRef.get();
-    const ultimoLembrete = configSnap.exists ? (_a = configSnap.data()) === null || _a === void 0 ? void 0 : _a.ultimoLembrete : null;
-    const hojeStr = hoje.toISOString().split('T')[0];
-    if (ultimoLembrete === hojeStr) {
-        console.log(`Lembretes já enviados hoje para empresa ${empresaId}`);
-        return;
-    }
     for (const tarefaDoc of tarefasSnap.docs) {
         const tarefa = tarefaDoc.data();
         if (tarefa.responsavelId) {
             await notificarUsuario(empresaId, tarefa.responsavelId, '⏰ Lembrete: Tarefa para hoje', `${formatTipo(tarefa.tipo)} em ${(_b = tarefa.propriedadeNome) !== null && _b !== void 0 ? _b : ''}`, tarefaDoc.id, null);
         }
     }
-    // Marca que já enviou lembretes hoje
     await configRef.set({ ultimoLembrete: hojeStr }, { merge: true });
 }
 async function enviarAlertasAtrasadas(db, empresaId) {
     var _a, _b, _c;
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
+    // Verifica se já enviou hoje
+    const configRef = db.collection('empresas').doc(empresaId).collection('config').doc('notificacoes');
+    const configSnap = await configRef.get();
+    const hojeStr = hoje.toISOString().split('T')[0];
+    if (configSnap.exists && ((_a = configSnap.data()) === null || _a === void 0 ? void 0 : _a.ultimoAlerta) === hojeStr) {
+        console.log(`Alertas já enviados hoje para ${empresaId}`);
+        return;
+    }
     const tarefasSnap = await db
         .collection('empresas')
         .doc(empresaId)
@@ -162,29 +158,16 @@ async function enviarAlertasAtrasadas(db, empresaId) {
         .where('data', '<', admin.firestore.Timestamp.fromDate(hoje))
         .get();
     console.log(`Empresa ${empresaId}: ${tarefasSnap.size} tarefas atrasadas`);
-    // Verifica se já enviou alertas hoje
-    const configRef = db.collection('empresas').doc(empresaId).collection('config').doc('notificacoes');
-    const configSnap = await configRef.get();
-    const ultimoAlerta = configSnap.exists ? (_a = configSnap.data()) === null || _a === void 0 ? void 0 : _a.ultimoAlerta : null;
-    const hojeStr = hoje.toISOString().split('T')[0];
-    if (ultimoAlerta === hojeStr) {
-        console.log(`Alertas já enviados hoje para empresa ${empresaId}`);
-        return;
-    }
     for (const tarefaDoc of tarefasSnap.docs) {
         const tarefa = tarefaDoc.data();
-        // Notifica o responsável
         if (tarefa.responsavelId) {
             await notificarUsuario(empresaId, tarefa.responsavelId, '🔴 Tarefa Atrasada', `${formatTipo(tarefa.tipo)} em ${(_b = tarefa.propriedadeNome) !== null && _b !== void 0 ? _b : ''} está atrasada`, tarefaDoc.id, null);
         }
-        // Notifica gestores
         await notificarGestores(empresaId, '🔴 Tarefa Atrasada', `${(_c = tarefa.responsavelNome) !== null && _c !== void 0 ? _c : 'Alguém'} tem tarefa atrasada: ${formatTipo(tarefa.tipo)}`, tarefaDoc.id, tarefa.responsavelId);
     }
-    // Marca que já enviou alertas hoje
     await configRef.set({ ultimoAlerta: hojeStr }, { merge: true });
 }
 async function notificarUsuario(empresaId, userId, title, body, tarefaId, excluirUsuarioId) {
-    // Não notifica se for o próprio usuário que executou a ação
     if (userId === excluirUsuarioId) {
         console.log(`Usuário ${userId} executou a ação, não será notificado`);
         return;
@@ -220,24 +203,25 @@ async function notificarUsuario(empresaId, userId, title, body, tarefaId, exclui
     };
     try {
         const resp = await admin.messaging().sendEachForMulticast(message);
-        console.log(`Notificação enviada para ${userId}: ${resp.successCount} sucesso`);
+        console.log(`Notificação para ${userId}: ${resp.successCount}/${tokens.length} enviadas`);
         await limparTokensInvalidos(resp, tokens, empresaId, userId);
     }
     catch (error) {
-        console.error(`Erro enviando notificação para ${userId}:`, error);
+        console.error(`Erro notificando ${userId}:`, error);
     }
 }
 async function notificarGestores(empresaId, title, body, tarefaId, excluirUsuarioId) {
+    // ← CORREÇÃO: MAIÚSCULAS para combinar com o Flutter
     const gestoresSnap = await admin
         .firestore()
         .collection('empresas')
         .doc(empresaId)
         .collection('usuarios')
-        .where('cargo', 'in', ['coordenador', 'supervisor', 'ceo', 'dev'])
+        .where('cargo', 'in', ['COORDENADOR', 'SUPERVISOR', 'CEO', 'DEV'])
         .get();
     console.log(`Encontrados ${gestoresSnap.size} gestores para notificar`);
     const notificacoes = gestoresSnap.docs
-        .filter((doc) => doc.id !== excluirUsuarioId) // Exclui quem fez a ação
+        .filter((doc) => doc.id !== excluirUsuarioId)
         .map((doc) => notificarUsuario(empresaId, doc.id, title, body, tarefaId, excluirUsuarioId));
     await Promise.all(notificacoes);
 }
@@ -274,7 +258,6 @@ function formatTipo(tipo) {
     return tipos[tipo] || tipo;
 }
 function calcularHoraLocal(data, timezone) {
-    // Calcula offset aproximado baseado em timezones comuns
     const offsets = {
         'Europe/Lisbon': 0,
         'Europe/London': 0,

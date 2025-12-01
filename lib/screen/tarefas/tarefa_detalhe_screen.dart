@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -773,12 +774,19 @@ class _TarefaDetalheScreenState extends State<TarefaDetalheScreen> {
                   child: ElevatedButton(
                     onPressed: () async {
                       setState(() => loading = true);
+
+                      final userId = FirebaseAuth.instance.currentUser?.uid;
+
                       await FirebaseFirestore.instance
                           .collection('empresas')
                           .doc(empresaId)
                           .collection('tarefas')
                           .doc(widget.tarefaId)
-                          .update({'status': 'reaberta'});
+                          .update({
+                            'status': 'reaberta',
+                            'reabertaPor': userId, // ← ADICIONA QUEM REABRIU
+                          });
+
                       setState(() => loading = false);
                     },
                     style: ElevatedButton.styleFrom(
