@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.alertaTarefasAtrasadas = exports.lembretesTarefasDiarias = exports.onTaskWrite = void 0;
+exports.verificarTarefas = exports.onTaskWrite = void 0;
 const functions = __importStar(require("firebase-functions"));
 const admin = __importStar(require("firebase-admin"));
 admin.initializeApp();
@@ -41,118 +41,154 @@ admin.initializeApp();
 exports.onTaskWrite = functions.region('europe-west1').firestore
     .document('empresas/{empresaId}/tarefas/{tarefaId}')
     .onWrite(async (change, ctx) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     const after = change.after.exists ? change.after.data() : null;
     const before = change.before.exists ? change.before.data() : null;
     if (!after)
         return;
     const empresaId = ctx.params.empresaId;
     const tarefaId = ctx.params.tarefaId;
+    // Pega quem fez a mudança (se disponível no contexto)
+    const executorId = ((_a = ctx.auth) === null || _a === void 0 ? void 0 : _a.uid) || null;
     // ============ CENÁRIO 1: Nova atribuição ============
     const newResp = after.responsavelId;
     const oldResp = before === null || before === void 0 ? void 0 : before.responsavelId;
     if (newResp && newResp !== oldResp) {
         console.log('nova atribuição detectada');
-        await notificarUsuario(empresaId, newResp, 'Nova tarefa atribuída', `${(_a = after.titulo) !== null && _a !== void 0 ? _a : 'Tarefa'} — ${(_b = after.propriedadeNome) !== null && _b !== void 0 ? _b : ''}`, tarefaId);
+        await notificarUsuario(empresaId, newResp, 'Nova tarefa atribuída', `${(_b = after.titulo) !== null && _b !== void 0 ? _b : 'Tarefa'} — ${(_c = after.propriedadeNome) !== null && _c !== void 0 ? _c : ''}`, tarefaId, executorId // não notifica quem atribuiu
+        );
     }
     // ============ CENÁRIO 2: Tarefa iniciada ============
     const newStatus = after.status;
     const oldStatus = before === null || before === void 0 ? void 0 : before.status;
     if (newStatus === 'em_andamento' && oldStatus === 'pendente') {
         console.log('tarefa iniciada - notificar gestores');
-        await notificarGestores(empresaId, '🟡 Tarefa Iniciada', `${(_c = after.responsavelNome) !== null && _c !== void 0 ? _c : 'Alguém'} iniciou ${formatTipo(after.tipo)} em ${(_d = after.propriedadeNome) !== null && _d !== void 0 ? _d : ''}`, tarefaId);
+        await notificarGestores(empresaId, '🟡 Tarefa Iniciada', `${(_d = after.responsavelNome) !== null && _d !== void 0 ? _d : 'Alguém'} iniciou ${formatTipo(after.tipo)} em ${(_e = after.propriedadeNome) !== null && _e !== void 0 ? _e : ''}`, tarefaId, after.responsavelId // não notifica quem iniciou
+        );
     }
     // ============ CENÁRIO 3: Tarefa concluída ============
     if (newStatus === 'concluida' && oldStatus !== 'concluida') {
         console.log('tarefa concluída - notificar gestores');
-        await notificarGestores(empresaId, '✅ Tarefa Concluída', `${(_e = after.responsavelNome) !== null && _e !== void 0 ? _e : 'Alguém'} concluiu ${formatTipo(after.tipo)} em ${(_f = after.propriedadeNome) !== null && _f !== void 0 ? _f : ''}`, tarefaId);
+        await notificarGestores(empresaId, '✅ Tarefa Concluída', `${(_f = after.responsavelNome) !== null && _f !== void 0 ? _f : 'Alguém'} concluiu ${formatTipo(after.tipo)} em ${(_g = after.propriedadeNome) !== null && _g !== void 0 ? _g : ''}`, tarefaId, after.responsavelId // não notifica quem concluiu
+        );
     }
     // ============ CENÁRIO 4: Tarefa reaberta ============
     if (newStatus === 'reaberta' && oldStatus !== 'reaberta') {
         console.log('tarefa reaberta');
-        // Notifica o responsável
-        if (after.responsavelId) {
-            await notificarUsuario(empresaId, after.responsavelId, '⚠️ Tarefa Reaberta', `A tarefa de ${formatTipo(after.tipo)} em ${(_g = after.propriedadeNome) !== null && _g !== void 0 ? _g : ''} foi reaberta`, tarefaId);
+        // Notifica o responsável (se não for ele que reabriu)
+        if (after.responsavelId && after.responsavelId !== executorId) {
+            await notificarUsuario(empresaId, after.responsavelId, '⚠️ Tarefa Reaberta', `A tarefa de ${formatTipo(after.tipo)} em ${(_h = after.propriedadeNome) !== null && _h !== void 0 ? _h : ''} foi reaberta`, tarefaId, executorId);
         }
-        // Notifica gestores
-        await notificarGestores(empresaId, '⚠️ Tarefa Reaberta', `${(_h = after.responsavelNome) !== null && _h !== void 0 ? _h : 'Alguém'} teve a tarefa de ${formatTipo(after.tipo)} reaberta`, tarefaId);
+        // Notifica gestores (exceto quem reabriu)
+        await notificarGestores(empresaId, '⚠️ Tarefa Reaberta', `${(_j = after.responsavelNome) !== null && _j !== void 0 ? _j : 'Alguém'} teve a tarefa de ${formatTipo(after.tipo)} reaberta`, tarefaId, executorId // não notifica quem reabriu
+        );
     }
 });
-// ============ NOTIFICAÇÃO AGENDADA: Lembretes diários ============
-// Roda todos os dias às 12h (hora de Portugal)
-exports.lembretesTarefasDiarias = functions
+// ============ NOTIFICAÇÃO AGENDADA: Lembretes e alertas ============
+// Roda a cada 2 horas para cobrir todos os timezones
+exports.verificarTarefas = functions
     .region('europe-west1')
-    .pubsub.schedule('0 12 * * *')
-    .timeZone('Europe/Lisbon')
+    .pubsub.schedule('0 */2 * * *') // A cada 2 horas
+    .timeZone('UTC')
     .onRun(async () => {
-    var _a;
-    console.log('Verificando tarefas pendentes do dia');
+    console.log('Verificando tarefas em todas as empresas');
     const db = admin.firestore();
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const amanha = new Date(hoje);
-    amanha.setDate(amanha.getDate() + 1);
+    const agora = new Date();
+    const horaAtual = agora.getUTCHours();
     // Busca todas as empresas
     const empresasSnap = await db.collection('empresas').get();
     for (const empresaDoc of empresasSnap.docs) {
         const empresaId = empresaDoc.id;
-        // Busca tarefas pendentes do dia
-        const tarefasSnap = await db
-            .collection('empresas')
-            .doc(empresaId)
-            .collection('tarefas')
-            .where('status', '==', 'pendente')
-            .where('data', '>=', admin.firestore.Timestamp.fromDate(hoje))
-            .where('data', '<', admin.firestore.Timestamp.fromDate(amanha))
-            .get();
-        console.log(`Empresa ${empresaId}: ${tarefasSnap.size} tarefas pendentes hoje`);
-        for (const tarefaDoc of tarefasSnap.docs) {
-            const tarefa = tarefaDoc.data();
-            if (tarefa.responsavelId) {
-                await notificarUsuario(empresaId, tarefa.responsavelId, '⏰ Lembrete: Tarefa para hoje', `${formatTipo(tarefa.tipo)} em ${(_a = tarefa.propriedadeNome) !== null && _a !== void 0 ? _a : ''}`, tarefaDoc.id);
-            }
+        const empresaData = empresaDoc.data();
+        // Pega timezone da empresa (padrão: Europe/Lisbon se não tiver)
+        const empresaTimezone = empresaData.timezone || 'Europe/Lisbon';
+        // Calcula hora local da empresa
+        const horaLocalEmpresa = calcularHoraLocal(agora, empresaTimezone);
+        console.log(`Empresa ${empresaId}: hora local ~${horaLocalEmpresa}h (timezone: ${empresaTimezone})`);
+        // ======== LEMBRETES MATINAIS (entre 8h e 10h local) ========
+        if (horaLocalEmpresa >= 8 && horaLocalEmpresa < 10) {
+            await enviarLembretesDiarios(db, empresaId);
         }
-    }
-    return null;
-});
-// ============ NOTIFICAÇÃO AGENDADA: Tarefas atrasadas ============
-// Roda todos os dias às 16h (hora de Portugal)
-exports.alertaTarefasAtrasadas = functions
-    .region('europe-west1')
-    .pubsub.schedule('0 16 * * *')
-    .timeZone('Europe/Lisbon')
-    .onRun(async () => {
-    var _a, _b;
-    console.log('Verificando tarefas atrasadas');
-    const db = admin.firestore();
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const empresasSnap = await db.collection('empresas').get();
-    for (const empresaDoc of empresasSnap.docs) {
-        const empresaId = empresaDoc.id;
-        // Busca tarefas não concluídas de dias anteriores
-        const tarefasSnap = await db
-            .collection('empresas')
-            .doc(empresaId)
-            .collection('tarefas')
-            .where('status', 'in', ['pendente', 'em_andamento', 'reaberta'])
-            .where('data', '<', admin.firestore.Timestamp.fromDate(hoje))
-            .get();
-        console.log(`Empresa ${empresaId}: ${tarefasSnap.size} tarefas atrasadas`);
-        for (const tarefaDoc of tarefasSnap.docs) {
-            const tarefa = tarefaDoc.data();
-            // Notifica o responsável
-            if (tarefa.responsavelId) {
-                await notificarUsuario(empresaId, tarefa.responsavelId, '🔴 Tarefa Atrasada', `${formatTipo(tarefa.tipo)} em ${(_a = tarefa.propriedadeNome) !== null && _a !== void 0 ? _a : ''} está atrasada`, tarefaDoc.id);
-            }
-            // Notifica gestores
-            await notificarGestores(empresaId, '🔴 Tarefa Atrasada', `${(_b = tarefa.responsavelNome) !== null && _b !== void 0 ? _b : 'Alguém'} tem tarefa atrasada: ${formatTipo(tarefa.tipo)}`, tarefaDoc.id);
+        // ======== ALERTAS DE TAREFAS ATRASADAS (entre 15h e 17h local) ========
+        if (horaLocalEmpresa >= 15 && horaLocalEmpresa < 17) {
+            await enviarAlertasAtrasadas(db, empresaId);
         }
     }
     return null;
 });
 // ============ FUNÇÕES AUXILIARES ============
-async function notificarUsuario(empresaId, userId, title, body, tarefaId) {
+async function enviarLembretesDiarios(db, empresaId) {
+    var _a, _b;
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const amanha = new Date(hoje);
+    amanha.setDate(amanha.getDate() + 1);
+    const tarefasSnap = await db
+        .collection('empresas')
+        .doc(empresaId)
+        .collection('tarefas')
+        .where('status', '==', 'pendente')
+        .where('data', '>=', admin.firestore.Timestamp.fromDate(hoje))
+        .where('data', '<', admin.firestore.Timestamp.fromDate(amanha))
+        .get();
+    console.log(`Empresa ${empresaId}: ${tarefasSnap.size} tarefas pendentes hoje`);
+    // Verifica se já enviou lembretes hoje
+    const configRef = db.collection('empresas').doc(empresaId).collection('config').doc('notificacoes');
+    const configSnap = await configRef.get();
+    const ultimoLembrete = configSnap.exists ? (_a = configSnap.data()) === null || _a === void 0 ? void 0 : _a.ultimoLembrete : null;
+    const hojeStr = hoje.toISOString().split('T')[0];
+    if (ultimoLembrete === hojeStr) {
+        console.log(`Lembretes já enviados hoje para empresa ${empresaId}`);
+        return;
+    }
+    for (const tarefaDoc of tarefasSnap.docs) {
+        const tarefa = tarefaDoc.data();
+        if (tarefa.responsavelId) {
+            await notificarUsuario(empresaId, tarefa.responsavelId, '⏰ Lembrete: Tarefa para hoje', `${formatTipo(tarefa.tipo)} em ${(_b = tarefa.propriedadeNome) !== null && _b !== void 0 ? _b : ''}`, tarefaDoc.id, null);
+        }
+    }
+    // Marca que já enviou lembretes hoje
+    await configRef.set({ ultimoLembrete: hojeStr }, { merge: true });
+}
+async function enviarAlertasAtrasadas(db, empresaId) {
+    var _a, _b, _c;
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const tarefasSnap = await db
+        .collection('empresas')
+        .doc(empresaId)
+        .collection('tarefas')
+        .where('status', 'in', ['pendente', 'em_andamento', 'reaberta'])
+        .where('data', '<', admin.firestore.Timestamp.fromDate(hoje))
+        .get();
+    console.log(`Empresa ${empresaId}: ${tarefasSnap.size} tarefas atrasadas`);
+    // Verifica se já enviou alertas hoje
+    const configRef = db.collection('empresas').doc(empresaId).collection('config').doc('notificacoes');
+    const configSnap = await configRef.get();
+    const ultimoAlerta = configSnap.exists ? (_a = configSnap.data()) === null || _a === void 0 ? void 0 : _a.ultimoAlerta : null;
+    const hojeStr = hoje.toISOString().split('T')[0];
+    if (ultimoAlerta === hojeStr) {
+        console.log(`Alertas já enviados hoje para empresa ${empresaId}`);
+        return;
+    }
+    for (const tarefaDoc of tarefasSnap.docs) {
+        const tarefa = tarefaDoc.data();
+        // Notifica o responsável
+        if (tarefa.responsavelId) {
+            await notificarUsuario(empresaId, tarefa.responsavelId, '🔴 Tarefa Atrasada', `${formatTipo(tarefa.tipo)} em ${(_b = tarefa.propriedadeNome) !== null && _b !== void 0 ? _b : ''} está atrasada`, tarefaDoc.id, null);
+        }
+        // Notifica gestores
+        await notificarGestores(empresaId, '🔴 Tarefa Atrasada', `${(_c = tarefa.responsavelNome) !== null && _c !== void 0 ? _c : 'Alguém'} tem tarefa atrasada: ${formatTipo(tarefa.tipo)}`, tarefaDoc.id, tarefa.responsavelId);
+    }
+    // Marca que já enviou alertas hoje
+    await configRef.set({ ultimoAlerta: hojeStr }, { merge: true });
+}
+async function notificarUsuario(empresaId, userId, title, body, tarefaId, excluirUsuarioId) {
+    // Não notifica se for o próprio usuário que executou a ação
+    if (userId === excluirUsuarioId) {
+        console.log(`Usuário ${userId} executou a ação, não será notificado`);
+        return;
+    }
     const tokensSnap = await admin
         .firestore()
         .collection('empresas')
@@ -185,14 +221,13 @@ async function notificarUsuario(empresaId, userId, title, body, tarefaId) {
     try {
         const resp = await admin.messaging().sendEachForMulticast(message);
         console.log(`Notificação enviada para ${userId}: ${resp.successCount} sucesso`);
-        // Remove tokens inválidos
         await limparTokensInvalidos(resp, tokens, empresaId, userId);
     }
     catch (error) {
         console.error(`Erro enviando notificação para ${userId}:`, error);
     }
 }
-async function notificarGestores(empresaId, title, body, tarefaId) {
+async function notificarGestores(empresaId, title, body, tarefaId, excluirUsuarioId) {
     const gestoresSnap = await admin
         .firestore()
         .collection('empresas')
@@ -201,7 +236,9 @@ async function notificarGestores(empresaId, title, body, tarefaId) {
         .where('cargo', 'in', ['coordenador', 'supervisor', 'ceo', 'dev'])
         .get();
     console.log(`Encontrados ${gestoresSnap.size} gestores para notificar`);
-    const notificacoes = gestoresSnap.docs.map((doc) => notificarUsuario(empresaId, doc.id, title, body, tarefaId));
+    const notificacoes = gestoresSnap.docs
+        .filter((doc) => doc.id !== excluirUsuarioId) // Exclui quem fez a ação
+        .map((doc) => notificarUsuario(empresaId, doc.id, title, body, tarefaId, excluirUsuarioId));
     await Promise.all(notificacoes);
 }
 async function limparTokensInvalidos(resp, tokens, empresaId, userId) {
@@ -235,4 +272,18 @@ function formatTipo(tipo) {
         'manutencao': 'manutenção'
     };
     return tipos[tipo] || tipo;
+}
+function calcularHoraLocal(data, timezone) {
+    // Calcula offset aproximado baseado em timezones comuns
+    const offsets = {
+        'Europe/Lisbon': 0,
+        'Europe/London': 0,
+        'America/Sao_Paulo': -3,
+        'America/Fortaleza': -3,
+        'America/Manaus': -4,
+        'America/Rio_Branco': -5,
+        'UTC': 0
+    };
+    const offset = offsets[timezone] || 0;
+    return (data.getUTCHours() + offset + 24) % 24;
 }
