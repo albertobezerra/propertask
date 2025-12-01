@@ -71,12 +71,16 @@ exports.onTaskWrite = functions.region('europe-west1').firestore
     // ============ CENÁRIO 4: Tarefa reaberta ============
     if (newStatus === 'reaberta' && oldStatus !== 'reaberta') {
         console.log('Tarefa reaberta');
-        // Notifica o responsável
-        if (after.responsavelId && after.responsavelId !== executorId) {
-            await notificarUsuario(empresaId, after.responsavelId, '⚠️ Tarefa Reaberta', `A tarefa de ${formatTipo(after.tipo)} em ${(_h = after.propriedadeNome) !== null && _h !== void 0 ? _h : ''} foi reaberta`, tarefaId, executorId);
+        // Pega quem reabriu do documento (mais confiável que ctx.auth)
+        const quemReabriu = after.reabertaPor || null;
+        // Notifica o responsável (se não for ele que reabriu)
+        if (after.responsavelId && after.responsavelId !== quemReabriu) {
+            await notificarUsuario(empresaId, after.responsavelId, '⚠️ Tarefa Reaberta', `A tarefa de ${formatTipo(after.tipo)} em ${(_h = after.propriedadeNome) !== null && _h !== void 0 ? _h : ''} foi reaberta`, tarefaId, quemReabriu // ← USA O CAMPO DO DOCUMENTO
+            );
         }
-        // Notifica gestores
-        await notificarGestores(empresaId, '⚠️ Tarefa Reaberta', `${(_j = after.responsavelNome) !== null && _j !== void 0 ? _j : 'Alguém'} teve a tarefa de ${formatTipo(after.tipo)} reaberta`, tarefaId, executorId);
+        // Notifica gestores (exceto quem reabriu)
+        await notificarGestores(empresaId, '⚠️ Tarefa Reaberta', `${(_j = after.responsavelNome) !== null && _j !== void 0 ? _j : 'Alguém'} teve a tarefa de ${formatTipo(after.tipo)} reaberta`, tarefaId, quemReabriu // ← USA O CAMPO DO DOCUMENTO
+        );
     }
 });
 // ============ NOTIFICAÇÃO AGENDADA: Lembretes e alertas ============

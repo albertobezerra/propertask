@@ -59,7 +59,6 @@ export const onTaskWrite = functions.region('europe-west1').firestore
         }
 
         // ============ CENÁRIO 4: Tarefa reaberta ============
-        // ============ CENÁRIO 4: Tarefa reaberta ============
         if (newStatus === 'reaberta' && oldStatus !== 'reaberta') {
             console.log('Tarefa reaberta');
 
