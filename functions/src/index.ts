@@ -2,172 +2,300 @@ import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 admin.initializeApp();
 
+// ============ NOTIFICAÇÕES EM TEMPO REAL (onWrite) ============
 export const onTaskWrite = functions.region('europe-west1').firestore
     .document('empresas/{empresaId}/tarefas/{tarefaId}')
     .onWrite(async (change, ctx) => {
-        console.log('onTaskWrite fired', {
-            empresaId: ctx.params.empresaId,
-            tarefaId: ctx.params.tarefaId,
-        });
-
         const after = change.after.exists ? (change.after.data() as any) : null;
         const before = change.before.exists ? (change.before.data() as any) : null;
 
-        if (!after) {
-            console.log('no after doc, exiting');
-            return;
-        }
+        if (!after) return;
 
         const empresaId = ctx.params.empresaId;
         const tarefaId = ctx.params.tarefaId;
 
-        // ============ CENÁRIO 1: Nova atribuição de responsável ============
+        // ============ CENÁRIO 1: Nova atribuição ============
         const newResp = after.responsavelId;
         const oldResp = before?.responsavelId;
-        console.log('responsavelId before/after', { oldResp, newResp });
 
         if (newResp && newResp !== oldResp) {
             console.log('nova atribuição detectada');
+            await notificarUsuario(
+                empresaId,
+                newResp,
+                'Nova tarefa atribuída',
+                `${after.titulo ?? 'Tarefa'} — ${after.propriedadeNome ?? ''}`,
+                tarefaId
+            );
+        }
 
-            const tokensSnap = await admin
-                .firestore()
+        // ============ CENÁRIO 2: Tarefa iniciada ============
+        const newStatus = after.status;
+        const oldStatus = before?.status;
+
+        if (newStatus === 'em_andamento' && oldStatus === 'pendente') {
+            console.log('tarefa iniciada - notificar gestores');
+            await notificarGestores(
+                empresaId,
+                '🟡 Tarefa Iniciada',
+                `${after.responsavelNome ?? 'Alguém'} iniciou ${formatTipo(after.tipo)} em ${after.propriedadeNome ?? ''}`,
+                tarefaId
+            );
+        }
+
+        // ============ CENÁRIO 3: Tarefa concluída ============
+        if (newStatus === 'concluida' && oldStatus !== 'concluida') {
+            console.log('tarefa concluída - notificar gestores');
+            await notificarGestores(
+                empresaId,
+                '✅ Tarefa Concluída',
+                `${after.responsavelNome ?? 'Alguém'} concluiu ${formatTipo(after.tipo)} em ${after.propriedadeNome ?? ''}`,
+                tarefaId
+            );
+        }
+
+        // ============ CENÁRIO 4: Tarefa reaberta ============
+        if (newStatus === 'reaberta' && oldStatus !== 'reaberta') {
+            console.log('tarefa reaberta');
+
+            // Notifica o responsável
+            if (after.responsavelId) {
+                await notificarUsuario(
+                    empresaId,
+                    after.responsavelId,
+                    '⚠️ Tarefa Reaberta',
+                    `A tarefa de ${formatTipo(after.tipo)} em ${after.propriedadeNome ?? ''} foi reaberta`,
+                    tarefaId
+                );
+            }
+
+            // Notifica gestores
+            await notificarGestores(
+                empresaId,
+                '⚠️ Tarefa Reaberta',
+                `${after.responsavelNome ?? 'Alguém'} teve a tarefa de ${formatTipo(after.tipo)} reaberta`,
+                tarefaId
+            );
+        }
+    });
+
+// ============ NOTIFICAÇÃO AGENDADA: Lembretes diários ============
+// Roda todos os dias às 12h (hora de Portugal)
+export const lembretesTarefasDiarias = functions
+    .region('europe-west1')
+    .pubsub.schedule('0 12 * * *')
+    .timeZone('Europe/Lisbon')
+    .onRun(async () => {
+        console.log('Verificando tarefas pendentes do dia');
+
+        const db = admin.firestore();
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+
+        const amanha = new Date(hoje);
+        amanha.setDate(amanha.getDate() + 1);
+
+        // Busca todas as empresas
+        const empresasSnap = await db.collection('empresas').get();
+
+        for (const empresaDoc of empresasSnap.docs) {
+            const empresaId = empresaDoc.id;
+
+            // Busca tarefas pendentes do dia
+            const tarefasSnap = await db
                 .collection('empresas')
                 .doc(empresaId)
-                .collection('usuarios')
-                .doc(newResp)
-                .collection('tokens')
+                .collection('tarefas')
+                .where('status', '==', 'pendente')
+                .where('data', '>=', admin.firestore.Timestamp.fromDate(hoje))
+                .where('data', '<', admin.firestore.Timestamp.fromDate(amanha))
                 .get();
 
-            const tokens = tokensSnap.docs.map((d) => d.id).filter(Boolean);
-            console.log('found tokens for assignment', tokens);
+            console.log(`Empresa ${empresaId}: ${tarefasSnap.size} tarefas pendentes hoje`);
 
-            if (tokens.length > 0) {
-                const titulo = after.titulo ?? 'Nova tarefa';
-                const prop = after.propriedadeNome ?? '';
-                const route = `/tarefas/${tarefaId}`;
+            for (const tarefaDoc of tarefasSnap.docs) {
+                const tarefa = tarefaDoc.data();
 
-                const message: admin.messaging.MulticastMessage = {
-                    notification: {
-                        title: 'Nova tarefa atribuída',
-                        body: `${titulo} — ${prop}`,
-                    },
-                    data: { route },
-                    tokens,
-                    android: { priority: 'high' },
-                    apns: { headers: { 'apns-priority': '10' } },
-                };
-
-                console.log('sending multicast for assignment', JSON.stringify(message));
-
-                try {
-                    const resp = await admin.messaging().sendEachForMulticast(message);
-                    console.log('multicast response for assignment', JSON.stringify(resp));
-                } catch (error) {
-                    console.error('error sending assignment notification', error);
+                if (tarefa.responsavelId) {
+                    await notificarUsuario(
+                        empresaId,
+                        tarefa.responsavelId,
+                        '⏰ Lembrete: Tarefa para hoje',
+                        `${formatTipo(tarefa.tipo)} em ${tarefa.propriedadeNome ?? ''}`,
+                        tarefaDoc.id
+                    );
                 }
             }
         }
 
-        // ============ CENÁRIO 2: Tarefa reaberta ============
-        const newStatus = after.status;
-        const oldStatus = before?.status;
-        console.log('status before/after', { oldStatus, newStatus });
+        return null;
+    });
 
-        if (newStatus === 'reaberta' && oldStatus !== 'reaberta') {
-            console.log('reabertura detectada');
+// ============ NOTIFICAÇÃO AGENDADA: Tarefas atrasadas ============
+// Roda todos os dias às 16h (hora de Portugal)
+export const alertaTarefasAtrasadas = functions
+    .region('europe-west1')
+    .pubsub.schedule('0 16 * * *')
+    .timeZone('Europe/Lisbon')
+    .onRun(async () => {
+        console.log('Verificando tarefas atrasadas');
 
-            const responsavelId = after.responsavelId;
+        const db = admin.firestore();
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
 
-            if (!responsavelId) {
-                console.log('tarefa reaberta sem responsável, exiting');
-                return;
-            }
+        const empresasSnap = await db.collection('empresas').get();
 
-            const tokensSnap = await admin
-                .firestore()
+        for (const empresaDoc of empresasSnap.docs) {
+            const empresaId = empresaDoc.id;
+
+            // Busca tarefas não concluídas de dias anteriores
+            const tarefasSnap = await db
                 .collection('empresas')
                 .doc(empresaId)
-                .collection('usuarios')
-                .doc(responsavelId)
-                .collection('tokens')
+                .collection('tarefas')
+                .where('status', 'in', ['pendente', 'em_andamento', 'reaberta'])
+                .where('data', '<', admin.firestore.Timestamp.fromDate(hoje))
                 .get();
 
-            const tokens = tokensSnap.docs.map((d) => d.id).filter(Boolean);
-            console.log('found tokens for reopening', tokens);
+            console.log(`Empresa ${empresaId}: ${tarefasSnap.size} tarefas atrasadas`);
 
-            if (tokens.length > 0) {
-                const tipo = formatTipo(after.tipo ?? 'tarefa');
-                const prop = after.propriedadeNome ?? 'Propriedade';
-                const route = `/tarefas/${tarefaId}`;
+            for (const tarefaDoc of tarefasSnap.docs) {
+                const tarefa = tarefaDoc.data();
 
-                const message: admin.messaging.MulticastMessage = {
-                    notification: {
-                        title: '⚠️ Tarefa Reaberta',
-                        body: `A tarefa de ${tipo} em ${prop} foi reaberta`,
-                    },
-                    data: {
-                        route,
-                        tipo: 'tarefa_reaberta',
-                        status: 'reaberta'
-                    },
-                    tokens,
-                    android: {
-                        priority: 'high',
-                        notification: {
-                            sound: 'default',
-                            channelId: 'tarefas_updates'
-                        }
-                    },
-                    apns: {
-                        headers: { 'apns-priority': '10' },
-                        payload: {
-                            aps: {
-                                sound: 'default'
-                            }
-                        }
-                    },
-                };
-
-                console.log('sending multicast for reopening', JSON.stringify(message));
-
-                try {
-                    const resp = await admin.messaging().sendEachForMulticast(message);
-                    console.log('multicast response for reopening', JSON.stringify(resp));
-
-                    // Remove tokens inválidos automaticamente
-                    const tokensToRemove: Promise<any>[] = [];
-                    resp.responses.forEach((result, index) => {
-                        const error = result.error;
-                        if (error) {
-                            console.error('Failure sending to', tokens[index], error);
-                            if (error.code === 'messaging/invalid-registration-token' ||
-                                error.code === 'messaging/registration-token-not-registered') {
-                                tokensToRemove.push(
-                                    admin.firestore()
-                                        .collection('empresas')
-                                        .doc(empresaId)
-                                        .collection('usuarios')
-                                        .doc(responsavelId)
-                                        .collection('tokens')
-                                        .doc(tokens[index])
-                                        .delete()
-                                );
-                            }
-                        }
-                    });
-
-                    if (tokensToRemove.length > 0) {
-                        await Promise.all(tokensToRemove);
-                        console.log(`Removed ${tokensToRemove.length} invalid tokens`);
-                    }
-                } catch (error) {
-                    console.error('error sending reopening notification', error);
+                // Notifica o responsável
+                if (tarefa.responsavelId) {
+                    await notificarUsuario(
+                        empresaId,
+                        tarefa.responsavelId,
+                        '🔴 Tarefa Atrasada',
+                        `${formatTipo(tarefa.tipo)} em ${tarefa.propriedadeNome ?? ''} está atrasada`,
+                        tarefaDoc.id
+                    );
                 }
+
+                // Notifica gestores
+                await notificarGestores(
+                    empresaId,
+                    '🔴 Tarefa Atrasada',
+                    `${tarefa.responsavelNome ?? 'Alguém'} tem tarefa atrasada: ${formatTipo(tarefa.tipo)}`,
+                    tarefaDoc.id
+                );
+            }
+        }
+
+        return null;
+    });
+
+// ============ FUNÇÕES AUXILIARES ============
+
+async function notificarUsuario(
+    empresaId: string,
+    userId: string,
+    title: string,
+    body: string,
+    tarefaId: string
+) {
+    const tokensSnap = await admin
+        .firestore()
+        .collection('empresas')
+        .doc(empresaId)
+        .collection('usuarios')
+        .doc(userId)
+        .collection('tokens')
+        .get();
+
+    const tokens = tokensSnap.docs.map((d) => d.id).filter(Boolean);
+
+    if (tokens.length === 0) {
+        console.log(`Usuário ${userId} sem tokens`);
+        return;
+    }
+
+    const message: admin.messaging.MulticastMessage = {
+        notification: { title, body },
+        data: { route: `/tarefas/${tarefaId}` },
+        tokens,
+        android: {
+            priority: 'high',
+            notification: {
+                sound: 'default',
+                channelId: 'tarefas_updates'
+            }
+        },
+        apns: {
+            headers: { 'apns-priority': '10' },
+            payload: { aps: { sound: 'default' } }
+        },
+    };
+
+    try {
+        const resp = await admin.messaging().sendEachForMulticast(message);
+        console.log(`Notificação enviada para ${userId}: ${resp.successCount} sucesso`);
+
+        // Remove tokens inválidos
+        await limparTokensInvalidos(resp, tokens, empresaId, userId);
+    } catch (error) {
+        console.error(`Erro enviando notificação para ${userId}:`, error);
+    }
+}
+
+async function notificarGestores(
+    empresaId: string,
+    title: string,
+    body: string,
+    tarefaId: string
+) {
+    const gestoresSnap = await admin
+        .firestore()
+        .collection('empresas')
+        .doc(empresaId)
+        .collection('usuarios')
+        .where('cargo', 'in', ['coordenador', 'supervisor', 'ceo', 'dev'])
+        .get();
+
+    console.log(`Encontrados ${gestoresSnap.size} gestores para notificar`);
+
+    const notificacoes = gestoresSnap.docs.map((doc) =>
+        notificarUsuario(empresaId, doc.id, title, body, tarefaId)
+    );
+
+    await Promise.all(notificacoes);
+}
+
+async function limparTokensInvalidos(
+    resp: admin.messaging.BatchResponse,
+    tokens: string[],
+    empresaId: string,
+    userId: string
+) {
+    const tokensToRemove: Promise<any>[] = [];
+
+    resp.responses.forEach((result, index) => {
+        const error = result.error;
+        if (error) {
+            if (error.code === 'messaging/invalid-registration-token' ||
+                error.code === 'messaging/registration-token-not-registered') {
+                tokensToRemove.push(
+                    admin.firestore()
+                        .collection('empresas')
+                        .doc(empresaId)
+                        .collection('usuarios')
+                        .doc(userId)
+                        .collection('tokens')
+                        .doc(tokens[index])
+                        .delete()
+                );
             }
         }
     });
 
-// Helper function para formatar tipo de tarefa
+    if (tokensToRemove.length > 0) {
+        await Promise.all(tokensToRemove);
+        console.log(`Removidos ${tokensToRemove.length} tokens inválidos`);
+    }
+}
+
 function formatTipo(tipo: string): string {
     const tipos: Record<string, string> = {
         'limpeza': 'limpeza',
