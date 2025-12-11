@@ -1,21 +1,24 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
-admin.initializeApp();
 
-// ============ NOTIFICAÇÕES EM TEMPO REAL (onWrite) ============
+admin.initializeApp();
+const db = admin.firestore();
+const storage = admin.storage();
+
+// ============ 1. NOTIFICAÇÕES EM TEMPO REAL (onWrite) ============
 export const onTaskWrite = functions.region('europe-west1').firestore
     .document('empresas/{empresaId}/tarefas/{tarefaId}')
     .onWrite(async (change, ctx) => {
         const after = change.after.exists ? (change.after.data() as any) : null;
         const before = change.before.exists ? (change.before.data() as any) : null;
 
-        if (!after) return;
+        if (!after) return; // Se não tem 'after', foi uma exclusão (tratada no onTaskDeleted)
 
         const empresaId = ctx.params.empresaId;
         const tarefaId = ctx.params.tarefaId;
         const executorId = ctx.auth?.uid || null;
 
-        // ============ CENÁRIO 1: Nova atribuição ============
+        // --- CENÁRIO 1: Nova atribuição ---
         const newResp = after.responsavelId;
         const oldResp = before?.responsavelId;
 
@@ -31,7 +34,7 @@ export const onTaskWrite = functions.region('europe-west1').firestore
             );
         }
 
-        // ============ CENÁRIO 2: Tarefa iniciada ============
+        // --- CENÁRIO 2: Tarefa iniciada ---
         const newStatus = after.status;
         const oldStatus = before?.status;
 
@@ -46,7 +49,7 @@ export const onTaskWrite = functions.region('europe-west1').firestore
             );
         }
 
-        // ============ CENÁRIO 3: Tarefa concluída ============
+        // --- CENÁRIO 3: Tarefa concluída ---
         if (newStatus === 'concluida' && oldStatus !== 'concluida') {
             console.log('Tarefa concluída - notificar gestores');
             await notificarGestores(
@@ -58,14 +61,12 @@ export const onTaskWrite = functions.region('europe-west1').firestore
             );
         }
 
-        // ============ CENÁRIO 4: Tarefa reaberta ============
+        // --- CENÁRIO 4: Tarefa reaberta ---
         if (newStatus === 'reaberta' && oldStatus !== 'reaberta') {
             console.log('Tarefa reaberta');
-
-            // Pega quem reabriu do documento (mais confiável que ctx.auth)
             const quemReabriu = after.reabertaPor || null;
 
-            // Notifica o responsável (se não for ele que reabriu)
+            // Notifica o responsável
             if (after.responsavelId && after.responsavelId !== quemReabriu) {
                 await notificarUsuario(
                     empresaId,
@@ -73,23 +74,71 @@ export const onTaskWrite = functions.region('europe-west1').firestore
                     '⚠️ Tarefa Reaberta',
                     `A tarefa de ${formatTipo(after.tipo)} em ${after.propriedadeNome ?? ''} foi reaberta`,
                     tarefaId,
-                    quemReabriu // ← USA O CAMPO DO DOCUMENTO
+                    quemReabriu
                 );
             }
 
-            // Notifica gestores (exceto quem reabriu)
+            // Notifica gestores
             await notificarGestores(
                 empresaId,
                 '⚠️ Tarefa Reaberta',
                 `${after.responsavelNome ?? 'Alguém'} teve a tarefa de ${formatTipo(after.tipo)} reaberta`,
                 tarefaId,
-                quemReabriu // ← USA O CAMPO DO DOCUMENTO
+                quemReabriu
             );
         }
-
     });
 
-// ============ NOTIFICAÇÃO AGENDADA: Lembretes e alertas ============
+// ============ 2. LIMPEZA DE IMAGENS (onDelete) [NOVO] ============
+// Isso resolve seu problema: Apaga imagens quando a tarefa é deletada
+export const onTaskDeleted = functions.region('europe-west1').firestore
+    .document('empresas/{empresaId}/tarefas/{tarefaId}')
+    .onDelete(async (snap, ctx) => {
+        const empresaId = ctx.params.empresaId;
+        const tarefaId = ctx.params.tarefaId;
+        const data = snap.data();
+
+        console.log(`Tarefa ${tarefaId} deletada. Iniciando limpeza de storage...`);
+
+        const bucket = storage.bucket();
+
+        // Estratégia A: Deletar a pasta inteira da tarefa (Se usar a estrutura nova)
+        // Caminho: empresas/ID_EMPRESA/tarefas/ID_PROPRIEDADE/ID_TAREFA/
+        if (data.propriedadeId) {
+            const folderPath = `empresas/${empresaId}/tarefas/${data.propriedadeId}/${tarefaId}/`;
+            try {
+                await bucket.deleteFiles({ prefix: folderPath });
+                console.log(`Pasta ${folderPath} removida com sucesso.`);
+            } catch (error) {
+                console.log(`Erro ou pasta vazia: ${folderPath}`, error);
+            }
+        }
+
+        // Estratégia B: Varrer array de fotos e deletar individualmente (Legacy/Backup)
+        // Caso a imagem esteja numa pasta antiga ou fora do padrão
+        if (data.fotos && Array.isArray(data.fotos)) {
+            const promises = data.fotos.map(async (url: string) => {
+                // Tenta extrair o caminho do arquivo da URL do Firebase Storage
+                // Ex: .../o/pasta%2Fimagem.jpg?alt... -> pasta/imagem.jpg
+                if (url.includes('firebasestorage')) {
+                    try {
+                        const pathStart = url.indexOf('/o/') + 3;
+                        const pathEnd = url.indexOf('?');
+                        const encodedPath = url.substring(pathStart, pathEnd);
+                        const filePath = decodeURIComponent(encodedPath);
+
+                        await bucket.file(filePath).delete();
+                        console.log(`Arquivo deletado: ${filePath}`);
+                    } catch (e) {
+                        console.log(`Falha ao deletar arquivo individual da URL`, e);
+                    }
+                }
+            });
+            await Promise.all(promises);
+        }
+    });
+
+// ============ 3. NOTIFICAÇÃO AGENDADA (Schedule) ============
 export const verificarTarefas = functions
     .region('europe-west1')
     .pubsub.schedule('0 */2 * * *')
@@ -97,7 +146,6 @@ export const verificarTarefas = functions
     .onRun(async () => {
         console.log('Verificando tarefas em todas as empresas');
 
-        const db = admin.firestore();
         const agora = new Date();
         const empresasSnap = await db.collection('empresas').get();
 
@@ -125,14 +173,13 @@ export const verificarTarefas = functions
 
 // ============ FUNÇÕES AUXILIARES ============
 
-async function enviarLembretesDiarios(db: admin.firestore.Firestore, empresaId: string) {
+async function enviarLembretesDiarios(firestore: admin.firestore.Firestore, empresaId: string) {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     const amanha = new Date(hoje);
     amanha.setDate(amanha.getDate() + 1);
 
-    // Verifica se já enviou hoje
-    const configRef = db.collection('empresas').doc(empresaId).collection('config').doc('notificacoes');
+    const configRef = firestore.collection('empresas').doc(empresaId).collection('config').doc('notificacoes');
     const configSnap = await configRef.get();
     const hojeStr = hoje.toISOString().split('T')[0];
 
@@ -141,7 +188,7 @@ async function enviarLembretesDiarios(db: admin.firestore.Firestore, empresaId: 
         return;
     }
 
-    const tarefasSnap = await db
+    const tarefasSnap = await firestore
         .collection('empresas')
         .doc(empresaId)
         .collection('tarefas')
@@ -169,12 +216,11 @@ async function enviarLembretesDiarios(db: admin.firestore.Firestore, empresaId: 
     await configRef.set({ ultimoLembrete: hojeStr }, { merge: true });
 }
 
-async function enviarAlertasAtrasadas(db: admin.firestore.Firestore, empresaId: string) {
+async function enviarAlertasAtrasadas(firestore: admin.firestore.Firestore, empresaId: string) {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
-    // Verifica se já enviou hoje
-    const configRef = db.collection('empresas').doc(empresaId).collection('config').doc('notificacoes');
+    const configRef = firestore.collection('empresas').doc(empresaId).collection('config').doc('notificacoes');
     const configSnap = await configRef.get();
     const hojeStr = hoje.toISOString().split('T')[0];
 
@@ -183,7 +229,7 @@ async function enviarAlertasAtrasadas(db: admin.firestore.Firestore, empresaId: 
         return;
     }
 
-    const tarefasSnap = await db
+    const tarefasSnap = await firestore
         .collection('empresas')
         .doc(empresaId)
         .collection('tarefas')
@@ -228,12 +274,10 @@ async function notificarUsuario(
     excluirUsuarioId: string | null
 ) {
     if (userId === excluirUsuarioId) {
-        console.log(`Usuário ${userId} executou a ação, não será notificado`);
         return;
     }
 
-    const tokensSnap = await admin
-        .firestore()
+    const tokensSnap = await db
         .collection('empresas')
         .doc(empresaId)
         .collection('usuarios')
@@ -244,7 +288,6 @@ async function notificarUsuario(
     const tokens = tokensSnap.docs.map((d) => d.id).filter(Boolean);
 
     if (tokens.length === 0) {
-        console.log(`Usuário ${userId} sem tokens`);
         return;
     }
 
@@ -267,7 +310,6 @@ async function notificarUsuario(
 
     try {
         const resp = await admin.messaging().sendEachForMulticast(message);
-        console.log(`Notificação para ${userId}: ${resp.successCount}/${tokens.length} enviadas`);
         await limparTokensInvalidos(resp, tokens, empresaId, userId);
     } catch (error) {
         console.error(`Erro notificando ${userId}:`, error);
@@ -281,16 +323,12 @@ async function notificarGestores(
     tarefaId: string,
     excluirUsuarioId: string | null
 ) {
-    // ← CORREÇÃO: MAIÚSCULAS para combinar com o Flutter
-    const gestoresSnap = await admin
-        .firestore()
+    const gestoresSnap = await db
         .collection('empresas')
         .doc(empresaId)
         .collection('usuarios')
         .where('cargo', 'in', ['COORDENADOR', 'SUPERVISOR', 'CEO', 'DEV'])
         .get();
-
-    console.log(`Encontrados ${gestoresSnap.size} gestores para notificar`);
 
     const notificacoes = gestoresSnap.docs
         .filter((doc) => doc.id !== excluirUsuarioId)
@@ -315,8 +353,7 @@ async function limparTokensInvalidos(
             if (error.code === 'messaging/invalid-registration-token' ||
                 error.code === 'messaging/registration-token-not-registered') {
                 tokensToRemove.push(
-                    admin.firestore()
-                        .collection('empresas')
+                    db.collection('empresas')
                         .doc(empresaId)
                         .collection('usuarios')
                         .doc(userId)
@@ -330,7 +367,7 @@ async function limparTokensInvalidos(
 
     if (tokensToRemove.length > 0) {
         await Promise.all(tokensToRemove);
-        console.log(`Removidos ${tokensToRemove.length} tokens inválidos`);
+        console.log(`Removidos ${tokensToRemove.length} tokens inválidos de ${userId}`);
     }
 }
 
